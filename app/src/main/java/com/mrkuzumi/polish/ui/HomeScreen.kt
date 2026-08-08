@@ -112,10 +112,10 @@ fun HomeScreen(
     fun inc(date: LocalDate) {
         val key = date.toString()
         val r = records[key] ?: Record(key)
-        records = records.toMutableMap().apply {
-            this[key] = r.copy(count = r.count + 1, timestamps = r.timestamps + System.currentTimeMillis())
-        }
+        val updated = r.copy(count = r.count + 1, timestamps = r.timestamps + System.currentTimeMillis())
+        records = records.toMutableMap().also { it[key] = updated }
         saveToken = System.currentTimeMillis()
+        onDataChanged() // 立即刷新 Stats / 终身统计
     }
 
     fun decBatch(date: LocalDate, newCount: Int) {
@@ -123,13 +123,13 @@ fun HomeScreen(
         val r = records[key] ?: return
         if (newCount >= r.count) return
         val drop = r.count - newCount
-        records = records.toMutableMap().apply {
-            this[key] = r.copy(
-                count = newCount,
-                timestamps = if (r.timestamps.size >= drop) r.timestamps.dropLast(drop) else emptyList(),
-            )
-        }
+        val updated = r.copy(
+            count = newCount,
+            timestamps = if (r.timestamps.size >= drop) r.timestamps.dropLast(drop) else emptyList(),
+        )
+        records = records.toMutableMap().also { it[key] = updated }
         saveToken = System.currentTimeMillis()
+        onDataChanged()
     }
 
     val selected = LocalDate.parse(selectedIso)
