@@ -16,8 +16,8 @@ android {
         // 版本号规则（与 versionName 联动）：
         //   V<大版本>.<新功能>.<bug修复>，例：V1.0.0 -> versionCode 10000
         //   versionCode = 大版本*10000 + 新功能*100 + bug修复
-        versionCode = 10107
-        versionName = "1.1.7"
+        versionCode = 10108
+        versionName = "1.1.8"
     }
 
     buildTypes {

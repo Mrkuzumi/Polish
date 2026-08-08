@@ -22,15 +22,12 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -41,13 +38,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mrkuzumi.polish.ui.GenderSelectScreen
 import com.mrkuzumi.polish.ui.HomeScreen
+import com.mrkuzumi.polish.ui.NotificationState
 import com.mrkuzumi.polish.ui.ProfileScreen
 import com.mrkuzumi.polish.ui.StatsScreen
+import com.mrkuzumi.polish.ui.TopNotification
 import com.mrkuzumi.polish.ui.UpdateInfo
 import com.mrkuzumi.polish.ui.checkForUpdate
+import com.mrkuzumi.polish.ui.rememberNotificationState
 import com.mrkuzumi.polish.ui.theme.PolishTheme
 import com.mrkuzumi.polish.util.Prefs
-import kotlinx.coroutines.launch
 
 private enum class MainTab { Home, Stats, Profile }
 
@@ -75,11 +74,8 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun MainApp() {
-    val snackbarHostState = remember { SnackbarHostState() }
-    val scope = rememberCoroutineScope()
-    val showSnackbar: (String) -> Unit = remember {
-        { msg -> scope.launch { snackbarHostState.showSnackbar(msg) } }
-    }
+    val notificationState = rememberNotificationState()
+    val notify: (String) -> Unit = remember { { msg -> notificationState.show(msg) } }
 
     var currentTab by rememberSaveable { mutableStateOf(MainTab.Home) }
     var dataVersion by rememberSaveable { mutableStateOf(0) }
@@ -87,52 +83,56 @@ private fun MainApp() {
     var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
     var showUpdateDialog by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(Unit) {
-        val info = checkForUpdate("1.1.7")
+        val info = checkForUpdate("1.1.8")
         if (info.available) { updateInfo = info; showUpdateDialog = true }
     }
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = MaterialTheme.colorScheme.background,
     ) { padding ->
-        Column(modifier = Modifier.padding(padding).fillMaxSize()) {
-            // 页面内容（占满除底部导航外的全部空间，含丝滑切换动画）
-            Box(modifier = Modifier.weight(1f)) {
-                Crossfade(
-                    targetState = currentTab,
-                    animationSpec = tween(350),
-                    label = "tab-crossfade",
-                ) { tab ->
-                    when (tab) {
-                        MainTab.Home -> HomeScreen(
-                            dataVersion = dataVersion,
-                            onDataChanged = { dataVersion++ },
-                            showSnackbar = showSnackbar,
-                        )
-                        MainTab.Stats -> StatsScreen(dataVersion = dataVersion)
-                        MainTab.Profile -> ProfileScreen(
-                            dataVersion = dataVersion,
-                            showSnackbar = showSnackbar,
-                            onManualUpdateCheck = { checkForUpdate("1.1.7") },
-                        )
+        Box(modifier = Modifier.padding(padding).fillMaxSize()) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                // 页面内容（含丝滑切换动画）
+                Box(modifier = Modifier.weight(1f)) {
+                    Crossfade(
+                        targetState = currentTab,
+                        animationSpec = tween(350),
+                        label = "tab-crossfade",
+                    ) { tab ->
+                        when (tab) {
+                            MainTab.Home -> HomeScreen(
+                                dataVersion = dataVersion,
+                                onDataChanged = { dataVersion++ },
+                                showSnackbar = notify,
+                            )
+                            MainTab.Stats -> StatsScreen(dataVersion = dataVersion)
+                            MainTab.Profile -> ProfileScreen(
+                                dataVersion = dataVersion,
+                                showSnackbar = notify,
+                                onManualUpdateCheck = { checkForUpdate("1.1.8") },
+                            )
+                        }
                     }
+                }
+
+                // 悬浮椭圆导航
+                Row(
+                    modifier = Modifier
+                        .padding(bottom = 12.dp, top = 4.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(50))
+                        .padding(3.dp)
+                        .align(Alignment.CenterHorizontally),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    PillTab("首页", Icons.Filled.Home, currentTab == MainTab.Home) { currentTab = MainTab.Home }
+                    PillTab("统计", Icons.Filled.BarChart, currentTab == MainTab.Stats) { currentTab = MainTab.Stats }
+                    PillTab("我的", Icons.Filled.Person, currentTab == MainTab.Profile) { currentTab = MainTab.Profile }
                 }
             }
 
-            // 悬浮椭圆导航（在内容下方，不遮挡）
-            Row(
-                modifier = Modifier
-                    .padding(bottom = 12.dp, top = 4.dp)
-                    .clip(RoundedCornerShape(50))
-                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(50))
-                    .padding(3.dp)
-                    .align(Alignment.CenterHorizontally),
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                PillTab("首页", Icons.Filled.Home, currentTab == MainTab.Home) { currentTab = MainTab.Home }
-                PillTab("统计", Icons.Filled.BarChart, currentTab == MainTab.Stats) { currentTab = MainTab.Stats }
-                PillTab("我的", Icons.Filled.Person, currentTab == MainTab.Profile) { currentTab = MainTab.Profile }
-            }
+            // 顶部白色通知（覆盖在内容之上）
+            TopNotification(state = notificationState)
         }
     }
 }
