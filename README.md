@@ -4,7 +4,8 @@
 
 # Polish（磨剑 / 挖矿）
 
-> 浅嫩粉色 Material You 风格的 Android 日常打卡日历 · 男 🦌 磨剑 / 女 ⛏ 挖矿
+> 浅嫩粉色 Material You 风格的 Android 日常打卡日历
+> 我知道海报中文看不清文字，但何必压力一只GPT image2娘呢
 
 ---
 
