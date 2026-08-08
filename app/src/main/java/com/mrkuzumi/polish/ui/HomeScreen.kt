@@ -173,6 +173,7 @@ fun HomeScreen(
             modifier = Modifier.fillMaxWidth().weight(1f),
             selected = selected,
             record = selectedRecord,
+            isBooked = selectedIso in bookedDates,
             onMinus = { decBatch(selected, (selectedRecord.count - 1).coerceAtLeast(0)) },
             onPlus = { inc(selected) },
             onEdit = { showEditSheet = true },
@@ -215,6 +216,7 @@ fun HomeScreen(
                 Button(onClick = {
                     MainActivity.scheduleReminder(context, date.toString())
                     bookingDate = null
+                    onDataChanged()
                     showSnackbar("已预约 $dateText 21:00 ${Terminology.verb(context)}提醒")
                 }) { Text("OK👌") }
             },
@@ -423,6 +425,7 @@ private fun BottomActionBar(
     modifier: Modifier,
     selected: LocalDate,
     record: com.mrkuzumi.polish.data.Record,
+    isBooked: Boolean,
     onMinus: () -> Unit,
     onPlus: () -> Unit,
     onEdit: () -> Unit,
@@ -450,6 +453,15 @@ private fun BottomActionBar(
                     modifier = Modifier.weight(1f),
                 )
                 Text(Terminology.emojiWithCount(LocalContext.current, count), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = cs.primary)
+            }
+
+            // 未来预约日期标记
+            if (isBooked) {
+                Text(
+                    "📅 已预约未来${Terminology.verb(LocalContext.current)}日（${selected.monthValue}月${selected.dayOfMonth}日 21:00 提醒）",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color(0xFF5B8DEF),
+                )
             }
 
             // 已保存的细节信息
