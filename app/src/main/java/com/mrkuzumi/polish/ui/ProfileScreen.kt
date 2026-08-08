@@ -17,10 +17,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -156,24 +158,34 @@ fun ProfileScreen(
         color = cs.outlineVariant,
     )
 
-    // ===== 下 2/3：功能按钮 =====
+    // ===== 下 2/3：功能按钮（浅粉底色 + 三等分） =====
     Column(
-        Modifier.fillMaxWidth().weight(2f).padding(horizontal = 32.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.Top,
+        Modifier.fillMaxWidth().weight(2f).padding(horizontal = 24.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        ProfileButton("关于作者") {
-            openUrl(context, "https://github.com/Mrkuzumi")
-        }
-        ProfileButton("查看源码") {
-            openUrl(context, "https://github.com/Mrkuzumi/Polish")
-        }
-        ProfileButton("检查更新") {
-            scope.launch {
-                val info = onManualUpdateCheck()
-                dialogInfo = info
-                showDialog = true
-            }
-        }
+        Button(
+            onClick = { openUrl(context, "https://github.com/Mrkuzumi") },
+            modifier = Modifier.fillMaxWidth().weight(1f),
+            shape = RoundedCornerShape(20.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = cs.primaryContainer, contentColor = cs.onPrimaryContainer),
+        ) { Text("关于作者", style = MaterialTheme.typography.titleMedium) }
+        Button(
+            onClick = { openUrl(context, "https://github.com/Mrkuzumi/Polish") },
+            modifier = Modifier.fillMaxWidth().weight(1f),
+            shape = RoundedCornerShape(20.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = cs.primaryContainer, contentColor = cs.onPrimaryContainer),
+        ) { Text("查看源码", style = MaterialTheme.typography.titleMedium) }
+        Button(
+            onClick = {
+                scope.launch {
+                    val info = onManualUpdateCheck()
+                    dialogInfo = info; showDialog = true
+                }
+            },
+            modifier = Modifier.fillMaxWidth().weight(1f),
+            shape = RoundedCornerShape(20.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = cs.primaryContainer, contentColor = cs.onPrimaryContainer),
+        ) { Text("检查更新", style = MaterialTheme.typography.titleMedium) }
     }
 
     } // 关闭外层 fillMaxSize Column
@@ -200,7 +212,7 @@ fun ProfileScreen(
                             textAlign = TextAlign.Start,
                         )
                     } else {
-                        Text("当前版本 V1.1.0 已是最新。", color = cs.onSurfaceVariant)
+                        Text("当前版本 V1.1.1 已是最新。", color = cs.onSurfaceVariant)
                     }
                 }
             },

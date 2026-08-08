@@ -4,16 +4,23 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -26,7 +33,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.mrkuzumi.polish.ui.GenderSelectScreen
 import com.mrkuzumi.polish.ui.HomeScreen
 import com.mrkuzumi.polish.ui.ProfileScreen
@@ -37,11 +49,7 @@ import com.mrkuzumi.polish.ui.theme.PolishTheme
 import com.mrkuzumi.polish.util.Prefs
 import kotlinx.coroutines.launch
 
-private enum class MainTab(val label: String) {
-    Home("首页"),
-    Stats("统计"),
-    Profile("我的"),
-}
+private enum class MainTab { Home, Stats, Profile }
 
 class MainActivity : ComponentActivity() {
 
@@ -76,11 +84,11 @@ private fun MainApp() {
     var currentTab by rememberSaveable { mutableStateOf(MainTab.Home) }
     var dataVersion by rememberSaveable { mutableStateOf(0) }
 
-    // 自动更新检查（启动时静默执行）
+    // 自动更新检查
     var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
     var showUpdateDialog by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(Unit) {
-        val info = checkForUpdate("1.1.0")
+        val info = checkForUpdate("1.1.1")
         if (info.available) {
             updateInfo = info
             showUpdateDialog = true
@@ -90,32 +98,9 @@ private fun MainApp() {
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = MaterialTheme.colorScheme.background,
-        bottomBar = {
-            NavigationBar(
-                containerColor = MaterialTheme.colorScheme.surface,
-            ) {
-                NavigationBarItem(
-                    selected = currentTab == MainTab.Home,
-                    onClick = { currentTab = MainTab.Home },
-                    icon = { Icon(Icons.Filled.Home, contentDescription = "首页") },
-                    label = { Text("首页") },
-                )
-                NavigationBarItem(
-                    selected = currentTab == MainTab.Stats,
-                    onClick = { currentTab = MainTab.Stats },
-                    icon = { Icon(Icons.Filled.BarChart, contentDescription = "统计") },
-                    label = { Text("统计") },
-                )
-                NavigationBarItem(
-                    selected = currentTab == MainTab.Profile,
-                    onClick = { currentTab = MainTab.Profile },
-                    icon = { Icon(Icons.Filled.Person, contentDescription = "我的") },
-                    label = { Text("我的") },
-                )
-            }
-        },
     ) { padding ->
         Box(modifier = Modifier.padding(padding)) {
+            // 页面内容
             when (currentTab) {
                 MainTab.Home -> HomeScreen(
                     dataVersion = dataVersion,
@@ -125,9 +110,46 @@ private fun MainApp() {
                 MainTab.Stats -> StatsScreen(dataVersion = dataVersion)
                 MainTab.Profile -> ProfileScreen(
                     showSnackbar = showSnackbar,
-                    onManualUpdateCheck = { checkForUpdate("1.1.0") },
+                    onManualUpdateCheck = { checkForUpdate("1.1.1") },
                 )
             }
+
+            // 悬浮椭圆三按钮导航
+            Row(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 12.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(50))
+                    .padding(3.dp),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                PillTab("首页", Icons.Filled.Home, currentTab == MainTab.Home) { currentTab = MainTab.Home }
+                PillTab("统计", Icons.Filled.BarChart, currentTab == MainTab.Stats) { currentTab = MainTab.Stats }
+                PillTab("我的", Icons.Filled.Person, currentTab == MainTab.Profile) { currentTab = MainTab.Profile }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PillTab(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, selected: Boolean, onClick: () -> Unit) {
+    val cs = MaterialTheme.colorScheme
+    val bg = if (selected) cs.primaryContainer else cs.surface
+    val fg = if (selected) cs.primary else cs.onSurfaceVariant
+
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(bg)
+            .clickable(onClick = onClick)
+            .padding(vertical = 10.dp, horizontal = 20.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Icon(icon, contentDescription = label, modifier = Modifier.size(20.dp), tint = fg)
+        if (selected) {
+            Text(label, color = fg, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
         }
     }
 }
