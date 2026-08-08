@@ -272,7 +272,7 @@ fun ProfileScreen(
             text = {
                 Column {
                     if (info.available) Text(info.releaseNotes, style = MaterialTheme.typography.bodyMedium, color = cs.onSurfaceVariant, maxLines = 20, textAlign = TextAlign.Start)
-                    else Text("当前版本 V1.2.0 已是最新。", color = cs.onSurfaceVariant)
+                    else Text("当前版本 V1.2.1 已是最新。", color = cs.onSurfaceVariant)
                 }
             },
             confirmButton = {
