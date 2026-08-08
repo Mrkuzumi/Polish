@@ -155,7 +155,7 @@ private fun MainApp() {
     var dlProgress by remember { mutableStateOf(DownloadProgress(0, false)) }
 
     val checkAndNotify = suspend {
-        val info = checkForUpdate("1.2.11")
+        val info = checkForUpdate("1.2.12")
         updateInfo = info
         if (info.available) {
             showUpdateDialog = true
@@ -240,26 +240,50 @@ private fun MainApp() {
             },
             confirmButton = {
                 if (dlProgress.done) {
-                    // 安装
+                    // 安装前检查「安装未知应用」权限
                     val file = java.io.File(context.cacheDir, "update.apk")
                     Button(onClick = {
-                        val ok = UpdateDownloader.install(context, file)
-                        if (ok) {
-                            showUpdateDialog = false
-                            dlProgress = DownloadProgress(0, false)
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !context.packageManager.canRequestPackageInstalls()) {
+                            // 引导用户去设置页开启
+                            val intent = Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                                data = android.net.Uri.parse("package:${context.packageName}")
+                                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                            }
+                            context.startActivity(intent)
+                            notify("请开启「安装未知应用」权限后重试")
+                        } else {
+                            val ok = UpdateDownloader.install(context, file)
+                            if (ok) {
+                                showUpdateDialog = false
+                                dlProgress = DownloadProgress(0, false)
+                            }
                         }
                     }) { Text("安装") }
                 } else if (dlProgress.percent > 0) {
                     // 正在下载，不显示按钮
                 } else {
                     Button(onClick = {
+                        dlProgress = DownloadProgress(1, false) // 立即显示进度条
                         scope.launch {
-                            val apkUrl = "https://github.com/Mrkuzumi/Polish/releases/download/V${info.latestVersion}/Polish_V${info.latestVersion}.apk"
-                            val tryUrls = listOf(apkUrl, info.downloadUrl, info.releaseUrl).filter { it.isNotBlank() }
+                            val urls = mutableListOf<String>()
+                            // 1) 标准 Release asset 直链
+                            urls.add("https://github.com/Mrkuzumi/Polish/releases/download/V${info.latestVersion}/Polish_V${info.latestVersion}.apk")
+                            // 2) API 返回的 browser_download_url
+                            if (info.downloadUrl.isNotBlank() && info.downloadUrl !in urls) urls.add(info.downloadUrl)
+                            // 3) release page (无法直接下载，但作为最后尝试)
+                            if (info.releaseUrl.isNotBlank() && info.releaseUrl !in urls) urls.add(info.releaseUrl)
+
                             var ok = false
-                            for (u in tryUrls) {
-                                val f = UpdateDownloader.download(u, context.cacheDir) { p -> dlProgress = DownloadProgress(p, false) }
-                                if (f != null) { dlProgress = DownloadProgress(100, true); ok = true; break }
+                            for ((i, u) in urls.withIndex()) {
+                                android.util.Log.d("PolishUpdate", "try download [$i]: $u")
+                                val f = UpdateDownloader.download(u, context.cacheDir) { p ->
+                                    if (p >= 0) dlProgress = DownloadProgress(p.coerceIn(1, 99), false)
+                                }
+                                if (f != null) {
+                                    dlProgress = DownloadProgress(100, true)
+                                    ok = true
+                                    break
+                                }
                             }
                             if (!ok) {
                                 dlProgress = DownloadProgress(0, false)
