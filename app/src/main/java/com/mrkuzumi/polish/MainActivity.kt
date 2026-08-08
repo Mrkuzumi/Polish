@@ -155,7 +155,7 @@ private fun MainApp() {
     var dlProgress by remember { mutableStateOf(DownloadProgress(0, false)) }
 
     val checkAndNotify = suspend {
-        val info = checkForUpdate("1.2.14")
+        val info = checkForUpdate("1.2.15")
         updateInfo = info
         if (info.available) {
             showUpdateDialog = true

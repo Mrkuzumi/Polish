@@ -299,6 +299,8 @@ fun ProfileScreen(
                 Spacer(Modifier.height(16.dp))
                 Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("@ImHaoI🔻(｡ì ω í｡)🔻", style = MaterialTheme.typography.bodyLarge, color = cs.onSurface)
+                    Spacer(Modifier.height(8.dp))
+                    Text("@锑氪铌铱锑", style = MaterialTheme.typography.bodyLarge, color = cs.onSurface)
                 }
                 Spacer(Modifier.height(16.dp))
                 TextButton(onClick = { showThanksDialog = false }) { Text("关闭") }

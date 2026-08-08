@@ -9,7 +9,7 @@ object Terminology {
     fun emoji(ctx: Context) = if (isFemale(ctx)) "⛏" else "🦌"
     fun verb(ctx: Context) = if (isFemale(ctx)) "挖矿" else "磨剑"
     fun emojiWithCount(ctx: Context, count: Int) = "${emoji(ctx)}×$count"
-    fun defaultUsername(ctx: Context) = "${verb(ctx)}用户"
+    fun defaultUsername(ctx: Context) = if (isFemale(ctx)) "矿工" else "铁匠"
 
     /** 通知文案 */
     fun reminderTitle(ctx: Context) = "该${verb(ctx)}了！"
