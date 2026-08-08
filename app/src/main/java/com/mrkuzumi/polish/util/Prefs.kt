@@ -8,15 +8,22 @@ import android.content.Context
 object Prefs {
     private const val NAME = "polish_prefs"
     private const val KEY_GENDER = "gender"
+    private const val KEY_USERNAME = "username"
 
     fun getGender(context: Context): String? =
-        context.getSharedPreferences(NAME, Context.MODE_PRIVATE)
-            .getString(KEY_GENDER, null)
+        prefs(context).getString(KEY_GENDER, null)
 
     fun setGender(context: Context, gender: String) {
-        context.getSharedPreferences(NAME, Context.MODE_PRIVATE)
-            .edit()
-            .putString(KEY_GENDER, gender)
-            .apply()
+        prefs(context).edit().putString(KEY_GENDER, gender).apply()
     }
+
+    fun getUsername(context: Context): String =
+        prefs(context).getString(KEY_USERNAME, "磨剑用户") ?: "磨剑用户"
+
+    fun setUsername(context: Context, name: String) {
+        prefs(context).edit().putString(KEY_USERNAME, name).apply()
+    }
+
+    private fun prefs(context: Context) =
+        context.getSharedPreferences(NAME, Context.MODE_PRIVATE)
 }

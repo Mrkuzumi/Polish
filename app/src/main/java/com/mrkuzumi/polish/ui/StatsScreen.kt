@@ -110,18 +110,37 @@ fun StatsScreen(dataVersion: Int) {
 
         // 每日柱状图
         Card(
-            Modifier.fillMaxWidth().fillMaxSize(),
+            Modifier.fillMaxWidth().weight(1f),
             shape = MaterialTheme.shapes.extraLarge,
             colors = CardDefaults.cardColors(containerColor = cs.surface),
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         ) {
             Column(Modifier.fillMaxSize().padding(20.dp)) {
                 Text("每日分布", style = MaterialTheme.typography.titleMedium, color = cs.onSurface)
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(8.dp))
                 DailyBarChart(
                     yearMonth = ym,
                     records = monthRecords,
-                    modifier = Modifier.fillMaxWidth().fillMaxSize(),
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                )
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        // 时段分布（带 0:00～24:00 刻度）
+        Card(
+            Modifier.fillMaxWidth().weight(0.9f),
+            shape = MaterialTheme.shapes.extraLarge,
+            colors = CardDefaults.cardColors(containerColor = cs.surface),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        ) {
+            Column(Modifier.fillMaxSize().padding(20.dp)) {
+                Text("时段分布", style = MaterialTheme.typography.titleMedium, color = cs.onSurface)
+                Spacer(Modifier.height(4.dp))
+                HourlyBarChart(
+                    timestamps = allTs,
+                    modifier = Modifier.fillMaxWidth().weight(1f),
                 )
             }
         }
@@ -182,6 +201,53 @@ private fun DailyBarChart(
                 topLeft = Offset(x, baseY - barH),
                 size = Size(barW, barH.coerceAtLeast(1f)),
             )
+        }
+    }
+}
+
+// ===================== 时段分布柱状图（0:00 ~ 24:00） =====================
+
+@Composable
+private fun HourlyBarChart(timestamps: List<Long>, modifier: Modifier) {
+    val cs = MaterialTheme.colorScheme
+    val hourCounts = IntArray(24)
+    timestamps.forEach { ts ->
+        val inst = java.time.Instant.ofEpochMilli(ts)
+        val ldt = java.time.LocalDateTime.ofInstant(inst, java.time.ZoneId.systemDefault())
+        hourCounts[ldt.hour]++
+    }
+    val maxCount = hourCounts.maxOrNull()?.coerceAtLeast(1) ?: 1
+
+    Column(modifier = modifier) {
+        Canvas(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            val w = size.width
+            val h = size.height
+            val barW = (w / 24) * 0.55f
+            val gap = w / 24f
+            val baseY = h * 0.95f
+
+            for (hour in 0..23) {
+                val cnt = hourCounts[hour]
+                val barH = if (cnt > 0) ((cnt.toFloat() / maxCount) * h * 0.9f).coerceAtLeast(3f) else 0f
+                val x = gap * hour + (gap - barW) / 2f
+                drawRect(
+                    color = if (cnt > 0) cs.primary else cs.outlineVariant.copy(alpha = 0.3f),
+                    topLeft = Offset(x, baseY - barH),
+                    size = Size(barW, barH.coerceAtLeast(1f)),
+                )
+            }
+        }
+        // 时间刻度标签
+        Row(Modifier.fillMaxWidth().padding(top = 2.dp)) {
+            listOf("0:00", "6:00", "12:00", "18:00", "24:00").forEach { label ->
+                Text(
+                    label,
+                    modifier = Modifier.weight(1f),
+                    fontSize = 10.sp,
+                    color = cs.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
+            }
         }
     }
 }

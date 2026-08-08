@@ -16,17 +16,22 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -39,6 +44,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -47,27 +53,28 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.mrkuzumi.polish.data.RecordRepository
 import com.mrkuzumi.polish.util.Prefs
 import kotlinx.coroutines.launch
 import java.io.File
 
 @Composable
 fun ProfileScreen(
+    dataVersion: Int,
     showSnackbar: (String) -> Unit,
     onManualUpdateCheck: suspend () -> UpdateInfo,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val cs = MaterialTheme.colorScheme
 
     // 头像
     val avatarFile = remember { File(context.filesDir, "avatar.jpg") }
     var avatarVersion by rememberSaveable { mutableStateOf(0) }
-    val imagePicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent(),
-    ) { uri ->
+    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         uri?.let {
             context.contentResolver.openInputStream(it)?.use { input ->
-                avatarFile.outputStream().use { output -> input.copyTo(output) }
+                avatarFile.outputStream().use { o -> input.copyTo(o) }
             }
             avatarVersion++
         }
@@ -76,179 +83,173 @@ fun ProfileScreen(
     // 性别
     var gender by rememberSaveable { mutableStateOf(Prefs.getGender(context) ?: "male") }
 
+    // 用户名
+    var username by rememberSaveable { mutableStateOf(Prefs.getUsername(context)) }
+    var showNameDialog by rememberSaveable { mutableStateOf(false) }
+    var nameInput by rememberSaveable { mutableStateOf(username) }
+
+    // 终身统计（所有记录总和，不按月重置）
+    val records = remember(dataVersion) { RecordRepository.loadAll(context) }
+    val lifetimeTotal = records.values.sumOf { it.count }
+
     // 更新弹窗
     var dialogInfo by remember { mutableStateOf<UpdateInfo?>(null) }
     var showDialog by rememberSaveable { mutableStateOf(false) }
 
-    val cs = MaterialTheme.colorScheme
-
-    // ===== 整体分为上 1/3 + 分隔 + 下 2/3 =====
+    // ===== 整体布局 =====
     Column(Modifier.fillMaxSize()) {
-        // ----- 上 1/3：头像 + 性别 -----
+        // ----- 上 1/3：头像 + 用户名 + 性别 + 终身统计 -----
         Column(
-            Modifier.fillMaxWidth().weight(1f).padding(top = 24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Box(
-            Modifier
-                .size(100.dp)
-                .clip(CircleShape)
-                .background(cs.surfaceVariant)
-                .clickable { imagePicker.launch("image/*") },
-            contentAlignment = Alignment.Center,
+            Modifier.fillMaxWidth().weight(1f).padding(top = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            if (avatarFile.exists()) {
-                AsyncImage(
-                    model = ImageRequest.Builder(context).data(avatarFile).crossfade(true).build(),
-                    contentDescription = "头像",
-                    modifier = Modifier.fillMaxSize().clip(CircleShape),
-                    contentScale = ContentScale.Crop,
-                )
-            } else {
-                Icon(
-                    Icons.Default.Person,
-                    contentDescription = "设置头像",
-                    modifier = Modifier.size(56.dp),
-                    tint = cs.onSurfaceVariant,
-                )
+            // 头像（右下角摄像机图标）
+            Box(
+                Modifier.size(90.dp).clickable { imagePicker.launch("image/*") },
+                contentAlignment = Alignment.BottomEnd,
+            ) {
+                Box(Modifier.size(90.dp).clip(CircleShape).background(cs.surfaceVariant), contentAlignment = Alignment.Center) {
+                    if (avatarFile.exists()) {
+                        AsyncImage(
+                            model = ImageRequest.Builder(context).data(avatarFile).crossfade(true).build(),
+                            contentDescription = "头像",
+                            modifier = Modifier.fillMaxSize().clip(CircleShape),
+                            contentScale = ContentScale.Crop,
+                        )
+                    } else {
+                        Icon(Icons.Default.Person, null, modifier = Modifier.size(50.dp), tint = cs.onSurfaceVariant)
+                    }
+                }
+                // 摄像机图标
+                Box(
+                    Modifier.size(26.dp).clip(CircleShape).background(Color.Gray.copy(alpha = 0.75f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Default.CameraAlt, "更换头像", modifier = Modifier.size(14.dp), tint = Color.White)
+                }
             }
-        }
-        Text(
-            "点击更换头像",
-            style = MaterialTheme.typography.labelSmall,
-            color = cs.onSurfaceVariant,
-            modifier = Modifier.padding(top = 4.dp),
-        )
 
-        Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(12.dp))
 
-        // 性别显示 + 切换
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                "性别",
-                style = MaterialTheme.typography.bodyMedium,
-                color = cs.onSurfaceVariant,
-            )
-            Spacer(Modifier.size(12.dp))
-            val isMale = gender == "male"
-            Text(
-                text = if (isMale) "♂ 男" else "♀ 女",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = cs.primary,
-            )
-            Spacer(Modifier.size(20.dp))
-            Button(
-                onClick = {
+            // 用户名 + 铅笔编辑
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 48.dp)) {
+                Text(username, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = cs.onSurface)
+                Spacer(Modifier.weight(1f).padding(horizontal = 8.dp))
+                IconButton(onClick = {
+                    nameInput = username; showNameDialog = true
+                }, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Default.Edit, "编辑用户名", modifier = Modifier.size(18.dp), tint = cs.onSurfaceVariant)
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            // 性别 + 终身统计
+            Row(
+                modifier = Modifier.padding(horizontal = 24.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+            ) {
+                Text("性别", style = MaterialTheme.typography.bodyMedium, color = cs.onSurfaceVariant)
+                Spacer(Modifier.width(6.dp))
+                val isMale = gender == "male"
+                Text(if (isMale) "♂ 男" else "♀ 女", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = cs.primary)
+                Spacer(Modifier.width(8.dp))
+                OutlinedButton(onClick = {
                     gender = if (isMale) "female" else "male"
                     Prefs.setGender(context, gender)
                     showSnackbar(if (isMale) "已切换为女性" else "已切换为男性")
-                },
-                shape = MaterialTheme.shapes.medium,
-            ) {
-                Text("切换")
+                }, modifier = Modifier.height(32.dp), shape = RoundedCornerShape(12.dp)) {
+                    Text("切换", fontSize = 12.sp)
+                }
+                Spacer(Modifier.width(16.dp))
+                Text("累计磨剑", style = MaterialTheme.typography.bodyMedium, color = cs.onSurfaceVariant)
+                Spacer(Modifier.width(4.dp))
+                Text("🦌×$lifetimeTotal", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = cs.primary)
             }
         }
-    }
 
-    // ===== 分隔线 =====
-    HorizontalDivider(
-        modifier = Modifier.padding(horizontal = 32.dp, vertical = 8.dp),
-        color = cs.outlineVariant,
-    )
+        // ----- 分隔线 -----
+        HorizontalDivider(modifier = Modifier.padding(horizontal = 32.dp, vertical = 4.dp), color = cs.outlineVariant)
 
-    // ===== 下 2/3：功能按钮（浅粉底色 + 三等分） =====
-    Column(
-        Modifier.fillMaxWidth().weight(2f).padding(horizontal = 24.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Button(
-            onClick = { openUrl(context, "https://github.com/Mrkuzumi") },
-            modifier = Modifier.fillMaxWidth().weight(1f),
-            shape = RoundedCornerShape(20.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = cs.primaryContainer, contentColor = cs.onPrimaryContainer),
-        ) { Text("关于作者", style = MaterialTheme.typography.titleMedium) }
-        Button(
-            onClick = { openUrl(context, "https://github.com/Mrkuzumi/Polish") },
-            modifier = Modifier.fillMaxWidth().weight(1f),
-            shape = RoundedCornerShape(20.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = cs.primaryContainer, contentColor = cs.onPrimaryContainer),
-        ) { Text("查看源码", style = MaterialTheme.typography.titleMedium) }
-        Button(
-            onClick = {
-                scope.launch {
-                    val info = onManualUpdateCheck()
-                    dialogInfo = info; showDialog = true
-                }
-            },
-            modifier = Modifier.fillMaxWidth().weight(1f),
-            shape = RoundedCornerShape(20.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = cs.primaryContainer, contentColor = cs.onPrimaryContainer),
-        ) { Text("检查更新", style = MaterialTheme.typography.titleMedium) }
-    }
-
+        // ----- 下 2/3：功能按钮（适中大小） -----
+        Column(
+            Modifier.fillMaxWidth().weight(2f).padding(horizontal = 32.dp, vertical = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Button(
+                onClick = { openUrl(context, "https://github.com/Mrkuzumi") },
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                shape = RoundedCornerShape(20.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = cs.primaryContainer, contentColor = cs.onPrimaryContainer),
+            ) { Text("关于作者", style = MaterialTheme.typography.titleMedium) }
+            Button(
+                onClick = { openUrl(context, "https://github.com/Mrkuzumi/Polish") },
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                shape = RoundedCornerShape(20.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = cs.primaryContainer, contentColor = cs.onPrimaryContainer),
+            ) { Text("查看源码", style = MaterialTheme.typography.titleMedium) }
+            Button(
+                onClick = {
+                    scope.launch { val info = onManualUpdateCheck(); dialogInfo = info; showDialog = true }
+                },
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                shape = RoundedCornerShape(20.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = cs.primaryContainer, contentColor = cs.onPrimaryContainer),
+            ) { Text("检查更新", style = MaterialTheme.typography.titleMedium) }
+        }
     } // 关闭外层 fillMaxSize Column
+
+    // 用户名编辑弹窗
+    if (showNameDialog) {
+        AlertDialog(
+            onDismissRequest = { showNameDialog = false },
+            title = { Text("修改用户名") },
+            text = {
+                OutlinedTextField(
+                    value = nameInput,
+                    onValueChange = { nameInput = it },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("输入用户名") },
+                )
+            },
+            confirmButton = {
+                Button(onClick = {
+                    val trimmed = nameInput.trim().ifEmpty { "磨剑用户" }
+                    Prefs.setUsername(context, trimmed)
+                    username = trimmed
+                    showNameDialog = false
+                }) { Text("保存") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showNameDialog = false }) { Text("取消") }
+            },
+        )
+    }
 
     // 更新弹窗
     if (showDialog && dialogInfo != null) {
         val info = dialogInfo!!
         AlertDialog(
             onDismissRequest = { showDialog = false },
-            title = {
-                Text(
-                    if (info.available) "发现新版本 V${info.latestVersion}" else "已是最新版本",
-                    style = MaterialTheme.typography.titleLarge,
-                )
-            },
+            title = { Text(if (info.available) "发现新版本 V${info.latestVersion}" else "已是最新版本", style = MaterialTheme.typography.titleLarge) },
             text = {
                 Column {
-                    if (info.available) {
-                        Text(
-                            info.releaseNotes,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = cs.onSurfaceVariant,
-                            maxLines = 20,
-                            textAlign = TextAlign.Start,
-                        )
-                    } else {
-                        Text("当前版本 V1.1.1 已是最新。", color = cs.onSurfaceVariant)
-                    }
+                    if (info.available) Text(info.releaseNotes, style = MaterialTheme.typography.bodyMedium, color = cs.onSurfaceVariant, maxLines = 20, textAlign = TextAlign.Start)
+                    else Text("当前版本 V1.1.5 已是最新。", color = cs.onSurfaceVariant)
                 }
             },
             confirmButton = {
-                if (info.available) {
-                    Button(onClick = {
-                        openUrl(context, info.releaseUrl.ifEmpty { info.downloadUrl })
-                        showDialog = false
-                    }) { Text("前往下载") }
-                } else {
-                    Button(onClick = { showDialog = false }) { Text("确定") }
-                }
+                if (info.available) Button(onClick = { openUrl(context, info.releaseUrl.ifEmpty { info.downloadUrl }); showDialog = false }) { Text("前往下载") }
+                else Button(onClick = { showDialog = false }) { Text("确定") }
             },
-            dismissButton = {
-                if (info.available) {
-                    TextButton(onClick = { showDialog = false }) { Text("暂不更新") }
-                }
-            },
+            dismissButton = { if (info.available) TextButton(onClick = { showDialog = false }) { Text("暂不更新") } },
         )
-    }
-}
-
-@Composable
-private fun ProfileButton(label: String, onClick: () -> Unit) {
-    OutlinedButton(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth().height(52.dp).padding(vertical = 4.dp),
-        shape = MaterialTheme.shapes.medium,
-    ) {
-        Text(label, style = MaterialTheme.typography.labelLarge)
     }
 }
 
 private fun openUrl(context: android.content.Context, url: String) {
     val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-    if (intent.resolveActivity(context.packageManager) != null) {
-        context.startActivity(intent)
-    }
+    if (intent.resolveActivity(context.packageManager) != null) context.startActivity(intent)
 }
