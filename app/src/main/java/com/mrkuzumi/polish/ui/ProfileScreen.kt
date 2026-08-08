@@ -45,13 +45,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.Image
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.mrkuzumi.polish.R
 import com.mrkuzumi.polish.data.RecordRepository
 import com.mrkuzumi.polish.util.Prefs
 import com.mrkuzumi.polish.util.Terminology
@@ -117,7 +120,12 @@ fun ProfileScreen(
                             contentScale = ContentScale.Crop,
                         )
                     } else {
-                        Icon(Icons.Default.Person, null, modifier = Modifier.size(50.dp), tint = cs.onSurfaceVariant)
+                        Image(
+                            painter = painterResource(R.mipmap.ic_launcher),
+                            contentDescription = "头像",
+                            modifier = Modifier.fillMaxSize().clip(CircleShape),
+                            contentScale = ContentScale.Crop,
+                        )
                     }
                 }
                 // 摄像机图标
@@ -231,28 +239,23 @@ fun ProfileScreen(
                 Modifier.fillMaxWidth().padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                // 头像
-                Box(Modifier.size(80.dp).clip(CircleShape).background(cs.surfaceVariant), contentAlignment = Alignment.Center) {
-                    if (avatarFile.exists()) {
-                        AsyncImage(
-                            model = ImageRequest.Builder(context).data(avatarFile).crossfade(true).build(),
-                            contentDescription = null,
-                            modifier = Modifier.fillMaxSize().clip(CircleShape),
-                            contentScale = ContentScale.Crop,
-                        )
-                    } else {
-                        Icon(Icons.Default.Person, null, Modifier.size(44.dp), tint = cs.onSurfaceVariant)
-                    }
-                }
+                Image(
+                    painter = painterResource(R.drawable.author_avatar),
+                    contentDescription = null,
+                    modifier = Modifier.size(80.dp).clip(CircleShape),
+                    contentScale = ContentScale.Crop,
+                )
                 Spacer(Modifier.height(12.dp))
                 Text("Mrkuzumi", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Text("开发者", style = MaterialTheme.typography.bodyMedium, color = cs.onSurfaceVariant)
-                Spacer(Modifier.height(20.dp))
+                Spacer(Modifier.height(16.dp))
                 Button(
                     onClick = { openUrl(context, "https://github.com/Mrkuzumi"); showAuthorDialog = false },
                     Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(containerColor = cs.primary),
                 ) { Text("访问 GitHub 主页") }
+                Spacer(Modifier.height(8.dp))
+                Text("https://github.com/Mrkuzumi", style = MaterialTheme.typography.labelSmall, color = cs.onSurfaceVariant)
             }
         }
     }
@@ -268,12 +271,14 @@ fun ProfileScreen(
                 Spacer(Modifier.height(8.dp))
                 Text("Polish（磨剑 / 挖矿）", style = MaterialTheme.typography.bodyLarge, color = cs.primary)
                 Text("浅嫩粉色 Material You 日常打卡日历", style = MaterialTheme.typography.bodyMedium, color = cs.onSurfaceVariant)
-                Spacer(Modifier.height(20.dp))
+                Spacer(Modifier.height(16.dp))
                 Button(
                     onClick = { openUrl(context, "https://github.com/Mrkuzumi/Polish"); showSourceDialog = false },
                     Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(containerColor = cs.primary),
                 ) { Text("访问仓库") }
+                Spacer(Modifier.height(8.dp))
+                Text("https://github.com/Mrkuzumi/Polish", style = MaterialTheme.typography.labelSmall, color = cs.onSurfaceVariant)
             }
         }
     }
