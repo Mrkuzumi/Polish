@@ -272,13 +272,13 @@ private fun CalendarCard(
                 IconButton(onClick = { val p = YearMonth.of(year, month).minusMonths(1); onMonthChange(p.year, p.monthValue) }) {
                     Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, "上月", tint = cs.onSurfaceVariant)
                 }
-                IconButton(onClick = { val n = YearMonth.of(year, month).plusMonths(1); onMonthChange(n.year, n.monthValue) }) {
-                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, "下月", tint = cs.onSurfaceVariant)
-                }
                 if (YearMonth.of(year, month) != YearMonth.from(today)) {
                     IconButton(onClick = onGoToday) {
                         Icon(Icons.Default.CalendarToday, "返回今天", tint = cs.primary)
                     }
+                }
+                IconButton(onClick = { val n = YearMonth.of(year, month).plusMonths(1); onMonthChange(n.year, n.monthValue) }) {
+                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, "下月", tint = cs.onSurfaceVariant)
                 }
             }
             Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
