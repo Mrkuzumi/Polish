@@ -83,7 +83,7 @@ private fun MainApp() {
     var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
     var showUpdateDialog by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(Unit) {
-        val info = checkForUpdate("1.1.8")
+        val info = checkForUpdate("1.1.9")
         if (info.available) { updateInfo = info; showUpdateDialog = true }
     }
 
@@ -109,7 +109,7 @@ private fun MainApp() {
                             MainTab.Profile -> ProfileScreen(
                                 dataVersion = dataVersion,
                                 showSnackbar = notify,
-                                onManualUpdateCheck = { checkForUpdate("1.1.8") },
+                                onManualUpdateCheck = { checkForUpdate("1.1.9") },
                             )
                         }
                     }
