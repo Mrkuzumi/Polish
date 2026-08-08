@@ -92,33 +92,38 @@ class MainActivity : ComponentActivity() {
     companion object {
         private const val CHANNEL_ID = "polish_reminder"
 
-        /** 预约未来某天 21:00 的磨剑提醒 */
+        /** 预约未来某天 21:00 的磨剑提醒（兼容所有 Android 版本，无需特殊权限） */
         fun scheduleReminder(context: Context, dateStr: String) {
-            val parts = dateStr.split("-")
-            if (parts.size != 3) return
-            val year = parts[0].toIntOrNull() ?: return
-            val month = parts[1].toIntOrNull() ?: return
-            val day = parts[2].toIntOrNull() ?: return
+            try {
+                val parts = dateStr.split("-")
+                if (parts.size != 3) return
+                val year = parts[0].toIntOrNull() ?: return
+                val month = parts[1].toIntOrNull() ?: return
+                val day = parts[2].toIntOrNull() ?: return
 
-            val cal = java.util.Calendar.getInstance().apply {
-                set(year, month - 1, day, 21, 0, 0)
-                set(java.util.Calendar.MILLISECOND, 0)
+                val cal = java.util.Calendar.getInstance().apply {
+                    set(year, month - 1, day, 21, 0, 0)
+                    set(java.util.Calendar.MILLISECOND, 0)
+                }
+                if (cal.timeInMillis <= System.currentTimeMillis()) return
+
+                val intent = Intent(context, PolishReminderReceiver::class.java).apply {
+                    putExtra("date", dateStr)
+                    putExtra("id", year * 1000 + cal.get(java.util.Calendar.DAY_OF_YEAR))
+                }
+                val pending = PendingIntent.getBroadcast(
+                    context,
+                    year * 1000 + cal.get(java.util.Calendar.DAY_OF_YEAR),
+                    intent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                )
+
+                val alarm = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+                // 使用 set() 而非 setExactAndAllowWhileIdle，避免需要 SCHEDULE_EXACT_ALARM 权限
+                alarm.set(AlarmManager.RTC_WAKEUP, cal.timeInMillis, pending)
+            } catch (_: Exception) {
+                android.widget.Toast.makeText(context, "预约失败，请检查系统权限", android.widget.Toast.LENGTH_SHORT).show()
             }
-            if (cal.timeInMillis <= System.currentTimeMillis()) return
-
-            val intent = Intent(context, PolishReminderReceiver::class.java).apply {
-                putExtra("date", dateStr)
-                putExtra("id", year * 1000 + cal.get(java.util.Calendar.DAY_OF_YEAR))
-            }
-            val pending = PendingIntent.getBroadcast(
-                context,
-                year * 1000 + cal.get(java.util.Calendar.DAY_OF_YEAR),
-                intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-            )
-
-            val alarm = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-            alarm.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, cal.timeInMillis, pending)
         }
     }
 }
@@ -134,7 +139,7 @@ private fun MainApp() {
     var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
     var showUpdateDialog by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(Unit) {
-        val info = checkForUpdate("1.2.2")
+        val info = checkForUpdate("1.2.3")
         if (info.available) { updateInfo = info; showUpdateDialog = true }
     }
 
@@ -159,7 +164,7 @@ private fun MainApp() {
                             MainTab.Profile -> ProfileScreen(
                                 dataVersion = dataVersion,
                                 showSnackbar = notify,
-                                onManualUpdateCheck = { checkForUpdate("1.2.2") },
+                                onManualUpdateCheck = { checkForUpdate("1.2.3") },
                             )
                         }
                     }
