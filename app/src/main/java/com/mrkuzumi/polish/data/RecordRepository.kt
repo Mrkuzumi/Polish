@@ -65,6 +65,12 @@ object RecordRepository {
         writeAll(context, all)
     }
 
+    // ---- 批量覆写（高性能路径） ----
+
+    fun saveAll(context: Context, records: Map<String, Record>) {
+        writeAll(context, records)
+    }
+
     // ---- 内部写文件 ----
 
     private fun writeAll(context: Context, records: Map<String, Record>) {

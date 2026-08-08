@@ -1,7 +1,8 @@
 package com.mrkuzumi.polish.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,6 +33,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -40,6 +43,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -48,7 +53,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mrkuzumi.polish.data.Record
 import com.mrkuzumi.polish.data.RecordRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import java.time.YearMonth
 
@@ -73,26 +80,50 @@ fun HomeScreen(
     var month by rememberSaveable { mutableStateOf(today.monthValue) }
     var showEditSheet by rememberSaveable { mutableStateOf(false) }
 
-    val records = remember(dataVersion) { RecordRepository.loadAll(context) }
+    // ★ 性能核心：mutableStateMapOf 内存操作，不每次读磁盘
+    val records = remember {
+        mutableStateMapOf<String, Record>().apply {
+            putAll(RecordRepository.loadAll(context))
+        }
+    }
+
+    // Debounce 持久化：变更后 500ms 无新操作才写磁盘
+    var saveToken by remember { mutableLongStateOf(0L) }
+    LaunchedEffect(saveToken) {
+        if (saveToken > 0L) {
+            delay(500)
+            withContext(Dispatchers.IO) {
+                RecordRepository.saveAll(context, records.toMap())
+            }
+            onDataChanged() // 通知 StatsScreen 刷新
+        }
+    }
+
+    fun inc(date: LocalDate) {
+        val key = date.toString()
+        val r = records[key] ?: Record(key)
+        records[key] = r.copy(count = r.count + 1, timestamps = r.timestamps + System.currentTimeMillis())
+        saveToken = System.currentTimeMillis()
+    }
+
+    fun decBatch(date: LocalDate, newCount: Int) {
+        val key = date.toString()
+        val r = records[key] ?: return
+        if (newCount >= r.count) return
+        val drop = r.count - newCount
+        records[key] = r.copy(
+            count = newCount,
+            timestamps = if (r.timestamps.size >= drop) r.timestamps.dropLast(drop) else emptyList(),
+        )
+        saveToken = System.currentTimeMillis()
+    }
+
     val selected = LocalDate.parse(selectedIso)
     val selectedRecord = records[selectedIso] ?: Record(dateIso = selectedIso)
-
-    fun inc(date: LocalDate, count: Int, ts: List<Long>) {
-        val r = Record(date.toString(), count + 1, ts + System.currentTimeMillis())
-        RecordRepository.save(context, r)
-        onDataChanged()
-    }
-    fun dec(date: LocalDate, count: Int, ts: List<Long>) {
-        if (count <= 0) return
-        val r = Record(date.toString(), count - 1, if (ts.isNotEmpty()) ts.dropLast(1) else ts)
-        RecordRepository.save(context, r)
-        onDataChanged()
-    }
 
     Column(
         modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
-        // 日历卡片（上 3/4）
         CalendarCard(
             modifier = Modifier.fillMaxWidth().weight(3f),
             year = year, month = month, today = today, selected = selected,
@@ -101,42 +132,34 @@ fun HomeScreen(
             onDayTap = { date ->
                 selectedIso = date.toString()
                 if (date.year != year || date.monthValue != month) { year = date.year; month = date.monthValue }
-                val r = records[date.toString()] ?: Record(date.toString())
-                inc(date, r.count, r.timestamps)
+                inc(date)
             },
-            onDayLongPress = { date, localCount ->
+            onDayLongPressEnd = { date, newCount ->
                 selectedIso = date.toString()
-                val r = records[date.toString()] ?: Record(date.toString())
-                if (r.count > 0) {
-                    val decBy = r.count - localCount
-                    if (decBy > 0) {
-                        val ts = r.timestamps.dropLast(decBy)
-                        RecordRepository.save(context, Record(date.toString(), localCount, ts))
-                        onDataChanged()
-                    }
-                }
+                decBatch(date, newCount)
             },
         )
 
         Spacer(Modifier.height(10.dp))
 
-        // 底部 1/4：日期信息 + [-][编辑细节][+] 按钮
         BottomActionBar(
             modifier = Modifier.fillMaxWidth().weight(1f),
             selected = selected,
             count = selectedRecord.count,
-            onMinus = { dec(selected, selectedRecord.count, selectedRecord.timestamps) },
-            onPlus = { inc(selected, selectedRecord.count, selectedRecord.timestamps) },
+            onMinus = { decBatch(selected, (selectedRecord.count - 1).coerceAtLeast(0)) },
+            onPlus = { inc(selected) },
             onEdit = { showEditSheet = true },
         )
     }
 
-    // 编辑 BottomSheet
     if (showEditSheet) {
         EditRecordSheet(
             record = selectedRecord,
             onSave = { updated ->
-                RecordRepository.save(context, updated); onDataChanged(); showEditSheet = false
+                records[updated.dateIso] = updated
+                saveToken = System.currentTimeMillis()
+                onDataChanged()
+                showEditSheet = false
             },
             onDismiss = { showEditSheet = false },
         )
@@ -153,7 +176,7 @@ private fun CalendarCard(
     records: Map<String, Record>,
     onMonthChange: (year: Int, month: Int) -> Unit,
     onDayTap: (LocalDate) -> Unit,
-    onDayLongPress: (LocalDate, localCount: Int) -> Unit,
+    onDayLongPressEnd: (LocalDate, localCount: Int) -> Unit,
 ) {
     val cs = MaterialTheme.colorScheme
     Card(
@@ -163,23 +186,20 @@ private fun CalendarCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
         Column(Modifier.fillMaxSize().padding(16.dp)) {
-            // 月份头部
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text("%d年%d月".format(year, month), style = MaterialTheme.typography.titleLarge, color = cs.onSurface, modifier = Modifier.weight(1f))
-                IconButton(onClick = { shiftMonth(year, month, -1, onMonthChange) }) {
+                IconButton(onClick = { val p = YearMonth.of(year, month).minusMonths(1); onMonthChange(p.year, p.monthValue) }) {
                     Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, "上月", tint = cs.onSurfaceVariant)
                 }
-                IconButton(onClick = { shiftMonth(year, month, 1, onMonthChange) }) {
+                IconButton(onClick = { val n = YearMonth.of(year, month).plusMonths(1); onMonthChange(n.year, n.monthValue) }) {
                     Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, "下月", tint = cs.onSurfaceVariant)
                 }
             }
-            // 星期表头
             Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                 WEEKDAYS.forEach { d ->
                     Text(d, style = MaterialTheme.typography.labelMedium, color = cs.onSurfaceVariant, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
                 }
             }
-            // 日期网格
             val grid = buildMonthGrid(YearMonth.of(year, month))
             Column(Modifier.fillMaxWidth().weight(1f), verticalArrangement = Arrangement.spacedBy(0.dp)) {
                 grid.chunked(7).forEach { week ->
@@ -193,8 +213,8 @@ private fun CalendarCard(
                                 isSelected = cell.date == selected,
                                 isToday = cell.date == today,
                                 recordCount = cnt,
-                                onTap = { if (cell.inMonth) onDayTap(cell.date) },
-                                onLongPressEnd = { localCount -> if (cell.inMonth) onDayLongPress(cell.date, localCount) },
+                                onTap = { onDayTap(cell.date) },
+                                onLongPressEnd = { localCount -> onDayLongPressEnd(cell.date, localCount) },
                                 modifier = Modifier.weight(1f),
                             )
                         }
@@ -203,10 +223,6 @@ private fun CalendarCard(
             }
         }
     }
-}
-
-private fun shiftMonth(year: Int, month: Int, delta: Int, cb: (Int, Int) -> Unit) {
-    val ym = YearMonth.of(year, month).plusMonths(delta.toLong()); cb(ym.year, ym.monthValue)
 }
 
 private data class DayCellData(val date: LocalDate, val dayNumber: Int, val inMonth: Boolean)
@@ -226,7 +242,7 @@ private fun buildMonthGrid(ym: YearMonth): List<DayCellData> {
     }
 }
 
-// ===================== 日期单元格（含 🦌 计数器） =====================
+// ===================== 日期单元格（含 🦌 计数器、零延迟手势） =====================
 
 @Composable
 private fun DayCell(
@@ -243,17 +259,15 @@ private fun DayCell(
     var longPressing by remember { mutableStateOf(false) }
     var localCount by remember(recordCount) { mutableIntStateOf(recordCount) }
 
-    // 长按持续减少
+    // 长按期间持续减少
     LaunchedEffect(longPressing) {
         if (longPressing) {
             localCount = recordCount
-            delay(400)
+            delay(400) // 长按确认后稍等再开始递减
             while (longPressing && localCount > 0) {
                 localCount--
-                delay(150) // ～每秒减少约 6 次
+                delay(150)
             }
-            onLongPressEnd(localCount)
-            longPressing = false
         }
     }
 
@@ -276,19 +290,39 @@ private fun DayCell(
             .fillMaxHeight()
             .clip(RoundedCornerShape(10.dp))
             .background(bgColor)
+            // ★ 关键：自定义手势，轻点立即响应，无 500ms 延迟
             .pointerInput(dayNumber) {
-                detectTapGestures(
-                    onTap = { if (inMonth) onTap() },
-                    onPress = {
-                        val tapNotLong = tryAwaitRelease()  // true=轻点, false=长按
-                        if (!tapNotLong && inMonth) {
-                            longPressing = true
-                            awaitRelease()                  // 等待手指松开
-                            longPressing = false
-                            onLongPressEnd(localCount)       // 松开时保存累积的减少次数
+                awaitEachGesture {
+                    val down = awaitFirstDown()
+                    // 并行等待：要么手指在长按超时前抬起（轻点），要么超时（长按）
+                    var isTap = false
+                    val longPressMs = viewConfiguration.longPressTimeoutMillis
+                    val start = System.currentTimeMillis()
+                    // 等指针全部抬起或超时
+                    while (System.currentTimeMillis() - start < longPressMs) {
+                        val event = awaitPointerEvent(PointerEventPass.Main)
+                        if (event.changes.all { it.changedToUp() }) {
+                            isTap = true
+                            break
                         }
-                    },
-                )
+                    }
+                    if (isTap) {
+                        if (inMonth) onTap()
+                    } else {
+                        // 长按开始
+                        if (inMonth) { longPressing = true }
+                        // 等待手指抬起
+                        var allUp = false
+                        while (!allUp) {
+                            val event = awaitPointerEvent(PointerEventPass.Main)
+                            allUp = event.changes.all { it.changedToUp() }
+                        }
+                        if (inMonth) {
+                            longPressing = false
+                            onLongPressEnd(localCount)
+                        }
+                    }
+                }
             },
         contentAlignment = Alignment.Center,
     ) {
@@ -334,41 +368,27 @@ private fun BottomActionBar(
             Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
-            // 已选日期 + 计数摘要
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.CheckCircle, null, tint = cs.primary)
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    text = "已选择 %d月%d日 · %s".format(
-                        selected.monthValue, selected.dayOfMonth,
-                        WEEKDAY_NAMES[selected.dayOfWeek.value - 1],
-                    ),
+                    "%d月%d日 · %s".format(selected.monthValue, selected.dayOfMonth, WEEKDAY_NAMES[selected.dayOfWeek.value - 1]),
                     style = MaterialTheme.typography.titleMedium,
                     color = cs.onPrimaryContainer,
                     modifier = Modifier.weight(1f),
                 )
                 Text("🦌×$count", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = cs.primary)
             }
-
-            // [-][编辑细节][+]
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                FilledTonalButton(
-                    onClick = onMinus,
-                    modifier = Modifier.weight(1f).height(48.dp),
-                    shape = RoundedCornerShape(14.dp),
-                ) { Text("−", fontSize = 22.sp, fontWeight = FontWeight.Bold) }
-
-                Button(
-                    onClick = onEdit,
-                    modifier = Modifier.weight(2f).height(48.dp),
-                    shape = RoundedCornerShape(14.dp),
-                ) { Icon(Icons.Default.Edit, null); Spacer(Modifier.size(6.dp)); Text("编辑细节", style = MaterialTheme.typography.labelLarge) }
-
-                FilledTonalButton(
-                    onClick = onPlus,
-                    modifier = Modifier.weight(1f).height(48.dp),
-                    shape = RoundedCornerShape(14.dp),
-                ) { Text("+", fontSize = 22.sp, fontWeight = FontWeight.Bold) }
+                FilledTonalButton(onClick = onMinus, modifier = Modifier.weight(1f).height(48.dp), shape = RoundedCornerShape(14.dp)) {
+                    Text("−", fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                }
+                Button(onClick = onEdit, modifier = Modifier.weight(2f).height(48.dp), shape = RoundedCornerShape(14.dp)) {
+                    Icon(Icons.Default.Edit, null); Spacer(Modifier.size(6.dp)); Text("编辑细节", style = MaterialTheme.typography.labelLarge)
+                }
+                FilledTonalButton(onClick = onPlus, modifier = Modifier.weight(1f).height(48.dp), shape = RoundedCornerShape(14.dp)) {
+                    Text("+", fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                }
             }
         }
     }

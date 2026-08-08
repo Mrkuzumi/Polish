@@ -88,7 +88,7 @@ private fun MainApp() {
     var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
     var showUpdateDialog by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(Unit) {
-        val info = checkForUpdate("1.1.2")
+        val info = checkForUpdate("1.1.3")
         if (info.available) {
             updateInfo = info
             showUpdateDialog = true
@@ -110,7 +110,7 @@ private fun MainApp() {
                 MainTab.Stats -> StatsScreen(dataVersion = dataVersion)
                 MainTab.Profile -> ProfileScreen(
                     showSnackbar = showSnackbar,
-                    onManualUpdateCheck = { checkForUpdate("1.1.2") },
+                    onManualUpdateCheck = { checkForUpdate("1.1.3") },
                 )
             }
 
