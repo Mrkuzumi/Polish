@@ -155,7 +155,7 @@ private fun MainApp() {
     var dlProgress by remember { mutableStateOf(DownloadProgress(0, false)) }
 
     val checkAndNotify = suspend {
-        val info = checkForUpdate("1.2.9")
+        val info = checkForUpdate("1.2.10")
         updateInfo = info
         if (info.available) {
             showUpdateDialog = true
@@ -243,8 +243,8 @@ private fun MainApp() {
                     // 安装
                     val file = java.io.File(context.cacheDir, "update.apk")
                     Button(onClick = {
-                        if (file.exists()) {
-                            UpdateDownloader.install(context, file)
+                        val ok = UpdateDownloader.install(context, file)
+                        if (ok) {
                             showUpdateDialog = false
                             dlProgress = DownloadProgress(0, false)
                         }
