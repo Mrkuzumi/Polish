@@ -27,6 +27,8 @@ object UpdateDownloader {
         try {
             val conn = (URL(url).openConnection() as HttpURLConnection).apply {
                 connectTimeout = 15_000; readTimeout = 30_000
+                instanceFollowRedirects = true
+                setRequestProperty("Accept", "application/octet-stream")
             }
             val total = conn.contentLength.toLong()
             val dest = File(destDir, "update.apk")
