@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CheckCircle
@@ -57,6 +58,7 @@ import androidx.compose.ui.unit.sp
 import com.mrkuzumi.polish.MainActivity
 import com.mrkuzumi.polish.data.Record
 import com.mrkuzumi.polish.data.RecordRepository
+import com.mrkuzumi.polish.util.Prefs
 import com.mrkuzumi.polish.util.Terminology
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -76,6 +78,7 @@ fun HomeScreen(
     dataVersion: Int,
     onDataChanged: () -> Unit,
     showSnackbar: (String) -> Unit,
+    dlProgress: DownloadProgress = DownloadProgress(0, false),
 ) {
     val context = LocalContext.current
     val today = remember { LocalDate.now() }
@@ -87,6 +90,9 @@ fun HomeScreen(
 
     // 预约未来日期的弹窗
     var bookingDate by remember { mutableStateOf<LocalDate?>(null) }
+
+    // 已预约日期（蓝色标记）
+    val bookedDates = remember(dataVersion) { Prefs.getBookedDates(context) }
 
     // ★ 性能核心：mutableStateOf 包装普通 Map，确保每次变更触发精准重组
     var records by remember { mutableStateOf(RecordRepository.loadAll(context).toMutableMap()) }
@@ -135,7 +141,7 @@ fun HomeScreen(
         CalendarCard(
             modifier = Modifier.fillMaxWidth().weight(3f),
             year = year, month = month, today = today, selected = selected,
-            records = records,
+            records = records, bookedDates = bookedDates,
             onMonthChange = { y, m -> year = y; month = m },
             onDayTap = { date ->
                 selectedIso = date.toString()
@@ -152,7 +158,16 @@ fun HomeScreen(
             },
         )
 
-        Spacer(Modifier.height(10.dp))
+        // 下载进度条
+        if (dlProgress.percent > 0 && !dlProgress.done) {
+            Spacer(Modifier.height(6.dp))
+            LinearProgressIndicator(
+                progress = { dlProgress.percent / 100f },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+            )
+        }
+
+        Spacer(Modifier.height(6.dp))
 
         BottomActionBar(
             modifier = Modifier.fillMaxWidth().weight(1f),
@@ -220,6 +235,7 @@ private fun CalendarCard(
     year: Int, month: Int,
     today: LocalDate, selected: LocalDate,
     records: Map<String, Record>,
+    bookedDates: Set<String>,
     onMonthChange: (year: Int, month: Int) -> Unit,
     onDayTap: (LocalDate) -> Unit,
     onDayLongPressEnd: (LocalDate, localCount: Int) -> Unit,
@@ -253,11 +269,13 @@ private fun CalendarCard(
                         week.forEach { cell ->
                             val iso = cell.date.toString()
                             val cnt = if (cell.inMonth) records[iso]?.count ?: 0 else 0
+                            val booked = cell.inMonth && iso in bookedDates
                             DayCell(
                                 dayNumber = cell.dayNumber,
                                 inMonth = cell.inMonth,
                                 isSelected = cell.date == selected,
                                 isToday = cell.date == today,
+                                isBooked = booked,
                                 recordCount = cnt,
                                 onTap = { onDayTap(cell.date) },
                                 onLongPressEnd = { localCount -> onDayLongPressEnd(cell.date, localCount) },
@@ -296,6 +314,7 @@ private fun DayCell(
     inMonth: Boolean,
     isSelected: Boolean,
     isToday: Boolean,
+    isBooked: Boolean,
     recordCount: Int,
     onTap: () -> Unit,
     onLongPressEnd: (localCount: Int) -> Unit,
@@ -324,6 +343,7 @@ private fun DayCell(
     val bgColor = when {
         isSelected -> cs.primaryContainer
         isToday -> cs.surfaceVariant
+        isBooked -> Color(0xFFD6E8FF) // 浅嫩蓝
         else -> Color.Transparent
     }
     val textColor = when {

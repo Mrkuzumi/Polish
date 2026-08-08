@@ -18,7 +18,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -26,15 +28,20 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -47,13 +54,16 @@ import com.mrkuzumi.polish.ui.GenderSelectScreen
 import com.mrkuzumi.polish.ui.HomeScreen
 import com.mrkuzumi.polish.ui.NotificationState
 import com.mrkuzumi.polish.ui.ProfileScreen
+import com.mrkuzumi.polish.ui.DownloadProgress
 import com.mrkuzumi.polish.ui.StatsScreen
 import com.mrkuzumi.polish.ui.TopNotification
+import com.mrkuzumi.polish.ui.UpdateDownloader
 import com.mrkuzumi.polish.ui.UpdateInfo
 import com.mrkuzumi.polish.ui.checkForUpdate
 import com.mrkuzumi.polish.ui.rememberNotificationState
 import com.mrkuzumi.polish.ui.theme.PolishTheme
 import com.mrkuzumi.polish.util.Prefs
+import kotlinx.coroutines.launch
 
 private enum class MainTab { Home, Stats, Profile }
 
@@ -119,8 +129,9 @@ class MainActivity : ComponentActivity() {
                 )
 
                 val alarm = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-                // 使用 set() 而非 setExactAndAllowWhileIdle，避免需要 SCHEDULE_EXACT_ALARM 权限
                 alarm.set(AlarmManager.RTC_WAKEUP, cal.timeInMillis, pending)
+                // 记录已预约日期
+                Prefs.addBookedDate(context, dateStr)
             } catch (_: Exception) {
                 android.widget.Toast.makeText(context, "预约失败，请检查系统权限", android.widget.Toast.LENGTH_SHORT).show()
             }
@@ -130,18 +141,32 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun MainApp() {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val notificationState = rememberNotificationState()
     val notify: (String) -> Unit = remember { { msg -> notificationState.show(msg) } }
+    val scope = rememberCoroutineScope()
 
     var currentTab by rememberSaveable { mutableStateOf(MainTab.Home) }
     var dataVersion by rememberSaveable { mutableStateOf(0) }
 
+    // 更新检查 + 下载
     var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
     var showUpdateDialog by rememberSaveable { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        val info = checkForUpdate("1.2.4")
-        if (info.available) { updateInfo = info; showUpdateDialog = true }
+    var dlProgress by remember { mutableStateOf(DownloadProgress(0, false)) }
+
+    val checkAndNotify = suspend {
+        val info = checkForUpdate("1.2.5")
+        updateInfo = info
+        if (info.available) {
+            showUpdateDialog = true
+            dlProgress = DownloadProgress(0, false)
+            notify("发现新版本 V${info.latestVersion}！")
+        } else {
+            notify("已是最新版本")
+        }
     }
+
+    LaunchedEffect(Unit) { checkAndNotify() }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -159,12 +184,13 @@ private fun MainApp() {
                                 dataVersion = dataVersion,
                                 onDataChanged = { dataVersion++ },
                                 showSnackbar = notify,
+                                dlProgress = dlProgress,
                             )
                             MainTab.Stats -> StatsScreen(dataVersion = dataVersion)
                             MainTab.Profile -> ProfileScreen(
                                 dataVersion = dataVersion,
                                 showSnackbar = notify,
-                                onManualUpdateCheck = { checkForUpdate("1.2.4") },
+                                onCheckUpdate = { scope.launch { checkAndNotify() } },
                             )
                         }
                     }
@@ -187,6 +213,72 @@ private fun MainApp() {
 
             TopNotification(state = notificationState)
         }
+    }
+
+    // 更新弹窗（全局）
+    if (showUpdateDialog && updateInfo != null) {
+        val info = updateInfo!!
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showUpdateDialog = false },
+            title = { Text("发现新版本 V${info.latestVersion}", style = MaterialTheme.typography.titleLarge) },
+            text = {
+                Column {
+                    if (dlProgress.percent > 0 && !dlProgress.done) {
+                        // 下载中
+                        Text("正在下载… ${dlProgress.percent}%", style = MaterialTheme.typography.bodyMedium)
+                        Spacer(Modifier.size(8.dp))
+                        androidx.compose.material3.LinearProgressIndicator(
+                            progress = { dlProgress.percent / 100f },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    } else if (dlProgress.done) {
+                        Text("下载完成！", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+                    } else {
+                        Text(info.releaseNotes, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 16)
+                    }
+                }
+            },
+            confirmButton = {
+                if (dlProgress.done) {
+                    // 安装
+                    val file = java.io.File(context.cacheDir, "update.apk")
+                    Button(onClick = {
+                        if (file.exists()) {
+                            UpdateDownloader.install(context, file)
+                            showUpdateDialog = false
+                            dlProgress = DownloadProgress(0, false)
+                        }
+                    }) { Text("安装") }
+                } else if (dlProgress.percent > 0) {
+                    // 正在下载，不显示按钮
+                } else {
+                    Button(onClick = {
+                        scope.launch {
+                            val file = UpdateDownloader.download(
+                                info.downloadUrl.ifEmpty { info.releaseUrl },
+                                context.cacheDir,
+                            ) { p -> dlProgress = DownloadProgress(p, false) }
+                            if (file != null) {
+                                dlProgress = DownloadProgress(100, true)
+                            } else {
+                                dlProgress = DownloadProgress(0, false)
+                                notify("下载失败，请稍后重试")
+                            }
+                        }
+                    }) { Text("下载并更新") }
+                }
+            },
+            dismissButton = {
+                if (!dlProgress.done && dlProgress.percent == 0) {
+                    TextButton(onClick = { showUpdateDialog = false }) { Text("暂不更新") }
+                } else if (dlProgress.done) {
+                    TextButton(onClick = {
+                        showUpdateDialog = false
+                        dlProgress = DownloadProgress(0, false)
+                    }) { Text("以后再说") }
+                }
+            },
+        )
     }
 }
 

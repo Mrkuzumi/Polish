@@ -38,7 +38,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -56,17 +55,15 @@ import coil.request.ImageRequest
 import com.mrkuzumi.polish.data.RecordRepository
 import com.mrkuzumi.polish.util.Prefs
 import com.mrkuzumi.polish.util.Terminology
-import kotlinx.coroutines.launch
 import java.io.File
 
 @Composable
 fun ProfileScreen(
     dataVersion: Int,
     showSnackbar: (String) -> Unit,
-    onManualUpdateCheck: suspend () -> UpdateInfo,
+    onCheckUpdate: () -> Unit,
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     val cs = MaterialTheme.colorScheme
 
     // 头像
@@ -97,10 +94,6 @@ fun ProfileScreen(
     var showLinkDialog by rememberSaveable { mutableStateOf(false) }
     var pendingUrl by remember { mutableStateOf("") }
     var pendingLabel by remember { mutableStateOf("") }
-
-    // 更新弹窗
-    var dialogInfo by remember { mutableStateOf<UpdateInfo?>(null) }
-    var showDialog by rememberSaveable { mutableStateOf(false) }
 
     // ===== 整体布局 =====
     Column(Modifier.fillMaxSize()) {
@@ -211,9 +204,7 @@ fun ProfileScreen(
                 colors = ButtonDefaults.buttonColors(containerColor = cs.primaryContainer, contentColor = cs.onPrimaryContainer),
             ) { Text("查看源码", style = MaterialTheme.typography.titleMedium) }
             Button(
-                onClick = {
-                    scope.launch { val info = onManualUpdateCheck(); dialogInfo = info; showDialog = true }
-                },
+                onClick = { onCheckUpdate() },
                 modifier = Modifier.fillMaxWidth().height(50.dp),
                 shape = RoundedCornerShape(20.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = cs.primaryContainer, contentColor = cs.onPrimaryContainer),
@@ -264,25 +255,6 @@ fun ProfileScreen(
         )
     }
 
-    // 更新弹窗
-    if (showDialog && dialogInfo != null) {
-        val info = dialogInfo!!
-        AlertDialog(
-            onDismissRequest = { showDialog = false },
-            title = { Text(if (info.available) "发现新版本 V${info.latestVersion}" else "已是最新版本", style = MaterialTheme.typography.titleLarge) },
-            text = {
-                Column {
-                    if (info.available) Text(info.releaseNotes, style = MaterialTheme.typography.bodyMedium, color = cs.onSurfaceVariant, maxLines = 20, textAlign = TextAlign.Start)
-                    else Text("当前版本 V1.2.4 已是最新。", color = cs.onSurfaceVariant)
-                }
-            },
-            confirmButton = {
-                if (info.available) Button(onClick = { openUrl(context, info.releaseUrl.ifEmpty { info.downloadUrl }); showDialog = false }) { Text("前往下载") }
-                else Button(onClick = { showDialog = false }) { Text("确定") }
-            },
-            dismissButton = { if (info.available) TextButton(onClick = { showDialog = false }) { Text("暂不更新") } },
-        )
-    }
 }
 
 private fun openUrl(context: android.content.Context, url: String) {

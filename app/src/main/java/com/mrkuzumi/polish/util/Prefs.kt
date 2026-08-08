@@ -9,6 +9,7 @@ object Prefs {
     private const val NAME = "polish_prefs"
     private const val KEY_GENDER = "gender"
     private const val KEY_USERNAME = "username"
+    private const val KEY_BOOKED = "booked_dates"
 
     fun getGender(context: Context): String? =
         prefs(context).getString(KEY_GENDER, null)
@@ -22,6 +23,16 @@ object Prefs {
 
     fun setUsername(context: Context, name: String) {
         prefs(context).edit().putString(KEY_USERNAME, name).apply()
+    }
+
+    // ---- 已预约的未来日期 ----
+    fun getBookedDates(context: Context): Set<String> =
+        prefs(context).getStringSet(KEY_BOOKED, emptySet()) ?: emptySet()
+
+    fun addBookedDate(context: Context, dateIso: String) {
+        val set = getBookedDates(context).toMutableSet()
+        set.add(dateIso)
+        prefs(context).edit().putStringSet(KEY_BOOKED, set).apply()
     }
 
     private fun prefs(context: Context) =
