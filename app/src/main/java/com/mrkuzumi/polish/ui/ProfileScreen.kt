@@ -220,15 +220,16 @@ fun ProfileScreen(
             text = {
                 OutlinedTextField(
                     value = nameInput,
-                    onValueChange = { nameInput = it },
+                    onValueChange = { if (it.length <= 20) nameInput = it },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("输入用户名") },
+                    placeholder = { Text("输入用户名（最多20字）") },
+                    supportingText = { Text("${nameInput.length}/20") },
                 )
             },
             confirmButton = {
                 Button(onClick = {
-                    val trimmed = nameInput.trim().ifEmpty { Terminology.defaultUsername(context) }
+                    val trimmed = nameInput.trim().take(20).ifEmpty { Terminology.defaultUsername(context) }
                     Prefs.setUsername(context, trimmed)
                     username = trimmed
                     showNameDialog = false

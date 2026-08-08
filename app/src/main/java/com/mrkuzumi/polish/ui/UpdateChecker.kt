@@ -35,6 +35,7 @@ suspend fun checkForUpdate(
         val conn = (url.openConnection() as HttpURLConnection).apply {
             connectTimeout = 10_000
             readTimeout = 10_000
+            instanceFollowRedirects = true
             setRequestProperty("Accept", "application/vnd.github+json")
         }
         if (conn.responseCode != 200) {

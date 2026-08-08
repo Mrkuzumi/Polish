@@ -155,7 +155,7 @@ private fun MainApp() {
     var dlProgress by remember { mutableStateOf(DownloadProgress(0, false)) }
 
     val checkAndNotify = suspend {
-        val info = checkForUpdate("1.2.7")
+        val info = checkForUpdate("1.2.8")
         updateInfo = info
         if (info.available) {
             showUpdateDialog = true
@@ -254,15 +254,16 @@ private fun MainApp() {
                 } else {
                     Button(onClick = {
                         scope.launch {
-                            val file = UpdateDownloader.download(
-                                info.downloadUrl.ifEmpty { info.releaseUrl },
-                                context.cacheDir,
-                            ) { p -> dlProgress = DownloadProgress(p, false) }
-                            if (file != null) {
-                                dlProgress = DownloadProgress(100, true)
-                            } else {
+                            val apkUrl = "https://github.com/Mrkuzumi/Polish/releases/download/V${info.latestVersion}/Polish_V${info.latestVersion}.apk"
+                            val tryUrls = listOf(apkUrl, info.downloadUrl, info.releaseUrl).filter { it.isNotBlank() }
+                            var ok = false
+                            for (u in tryUrls) {
+                                val f = UpdateDownloader.download(u, context.cacheDir) { p -> dlProgress = DownloadProgress(p, false) }
+                                if (f != null) { dlProgress = DownloadProgress(100, true); ok = true; break }
+                            }
+                            if (!ok) {
                                 dlProgress = DownloadProgress(0, false)
-                                notify("下载失败，请稍后重试")
+                                notify("下载失败，请检查网络后重试")
                             }
                         }
                     }) { Text("下载并更新") }
