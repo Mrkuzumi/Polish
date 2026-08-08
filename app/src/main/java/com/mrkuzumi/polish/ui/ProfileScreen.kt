@@ -92,6 +92,11 @@ fun ProfileScreen(
     val records = remember(dataVersion) { RecordRepository.loadAll(context) }
     val lifetimeTotal = records.values.sumOf { it.count }
 
+    // GitHub 跳转确认弹窗
+    var showLinkDialog by rememberSaveable { mutableStateOf(false) }
+    var pendingUrl by remember { mutableStateOf("") }
+    var pendingLabel by remember { mutableStateOf("") }
+
     // 更新弹窗
     var dialogInfo by remember { mutableStateOf<UpdateInfo?>(null) }
     var showDialog by rememberSaveable { mutableStateOf(false) }
@@ -131,35 +136,42 @@ fun ProfileScreen(
 
             Spacer(Modifier.height(12.dp))
 
-            // 用户名 + 铅笔编辑
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 48.dp)) {
-                Text(username, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = cs.onSurface)
-                Spacer(Modifier.weight(1f).padding(horizontal = 8.dp))
-                IconButton(onClick = {
-                    nameInput = username; showNameDialog = true
-                }, modifier = Modifier.size(32.dp)) {
+            // 用户名（居中 + 大字号）+ 右侧铅笔编辑
+            Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp)) {
+                Text(
+                    username,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = cs.onSurface,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.align(Alignment.Center).padding(horizontal = 36.dp).fillMaxWidth(),
+                )
+                IconButton(
+                    onClick = { nameInput = username; showNameDialog = true },
+                    modifier = Modifier.size(32.dp).align(Alignment.CenterEnd),
+                ) {
                     Icon(Icons.Default.Edit, "编辑用户名", modifier = Modifier.size(18.dp), tint = cs.onSurfaceVariant)
                 }
             }
 
             Spacer(Modifier.height(16.dp))
 
-            // 性别 + 终身统计
+            // 性别 + 终身统计（按钮居中对齐）
             Row(
                 modifier = Modifier.padding(horizontal = 24.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center,
             ) {
-                Text("性别", style = MaterialTheme.typography.bodyMedium, color = cs.onSurfaceVariant)
+                Text("性别", style = MaterialTheme.typography.bodyMedium, color = cs.onSurfaceVariant, modifier = Modifier.align(Alignment.CenterVertically))
                 Spacer(Modifier.width(6.dp))
                 val isMale = gender == "male"
-                Text(if (isMale) "♂ 男" else "♀ 女", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = cs.primary)
+                Text(if (isMale) "♂ 男" else "♀ 女", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = cs.primary, modifier = Modifier.align(Alignment.CenterVertically))
                 Spacer(Modifier.width(8.dp))
                 OutlinedButton(onClick = {
                     gender = if (isMale) "female" else "male"
                     Prefs.setGender(context, gender)
                     showSnackbar(if (isMale) "已切换为女性" else "已切换为男性")
-                }, modifier = Modifier.height(32.dp), shape = RoundedCornerShape(12.dp)) {
+                }, modifier = Modifier.height(32.dp).align(Alignment.CenterVertically), shape = RoundedCornerShape(12.dp)) {
                     Text("切换", fontSize = 12.sp)
                 }
                 Spacer(Modifier.width(16.dp))
@@ -178,13 +190,21 @@ fun ProfileScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Button(
-                onClick = { openUrl(context, "https://github.com/Mrkuzumi") },
+                onClick = {
+                    pendingUrl = "https://github.com/Mrkuzumi"
+                    pendingLabel = "关于作者 (Mrkuzumi)"
+                    showLinkDialog = true
+                },
                 modifier = Modifier.fillMaxWidth().height(50.dp),
                 shape = RoundedCornerShape(20.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = cs.primaryContainer, contentColor = cs.onPrimaryContainer),
             ) { Text("关于作者", style = MaterialTheme.typography.titleMedium) }
             Button(
-                onClick = { openUrl(context, "https://github.com/Mrkuzumi/Polish") },
+                onClick = {
+                    pendingUrl = "https://github.com/Mrkuzumi/Polish"
+                    pendingLabel = "查看源码 (Polish)"
+                    showLinkDialog = true
+                },
                 modifier = Modifier.fillMaxWidth().height(50.dp),
                 shape = RoundedCornerShape(20.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = cs.primaryContainer, contentColor = cs.onPrimaryContainer),
@@ -228,6 +248,21 @@ fun ProfileScreen(
         )
     }
 
+    // GitHub 跳转确认弹窗
+    if (showLinkDialog) {
+        AlertDialog(
+            onDismissRequest = { showLinkDialog = false },
+            title = { Text("跳转外部链接") },
+            text = { Text("是否跳转到「$pendingLabel」对应的GitHub页面？") },
+            confirmButton = {
+                Button(onClick = { openUrl(context, pendingUrl); showLinkDialog = false }) { Text("跳转") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLinkDialog = false }) { Text("取消") }
+            },
+        )
+    }
+
     // 更新弹窗
     if (showDialog && dialogInfo != null) {
         val info = dialogInfo!!
@@ -237,7 +272,7 @@ fun ProfileScreen(
             text = {
                 Column {
                     if (info.available) Text(info.releaseNotes, style = MaterialTheme.typography.bodyMedium, color = cs.onSurfaceVariant, maxLines = 20, textAlign = TextAlign.Start)
-                    else Text("当前版本 V1.1.5 已是最新。", color = cs.onSurfaceVariant)
+                    else Text("当前版本 V1.1.6 已是最新。", color = cs.onSurfaceVariant)
                 }
             },
             confirmButton = {

@@ -147,7 +147,7 @@ fun HomeScreen(
         BottomActionBar(
             modifier = Modifier.fillMaxWidth().weight(1f),
             selected = selected,
-            count = selectedRecord.count,
+            record = selectedRecord,
             onMinus = { decBatch(selected, (selectedRecord.count - 1).coerceAtLeast(0)) },
             onPlus = { inc(selected) },
             onEdit = { showEditSheet = true },
@@ -358,12 +358,13 @@ private fun DayCell(
 private fun BottomActionBar(
     modifier: Modifier,
     selected: LocalDate,
-    count: Int,
+    record: com.mrkuzumi.polish.data.Record,
     onMinus: () -> Unit,
     onPlus: () -> Unit,
     onEdit: () -> Unit,
 ) {
     val cs = MaterialTheme.colorScheme
+    val count = record.count
     Card(
         modifier = modifier,
         shape = MaterialTheme.shapes.extraLarge,
@@ -371,9 +372,10 @@ private fun BottomActionBar(
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Column(
-            Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 12.dp),
+            Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 10.dp),
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
+            // 日期 + 计数
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.CheckCircle, null, tint = cs.primary)
                 Spacer(Modifier.width(8.dp))
@@ -385,6 +387,21 @@ private fun BottomActionBar(
                 )
                 Text("🦌×$count", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = cs.primary)
             }
+
+            // 已保存的细节信息
+            if (record.dish.isNotBlank() || record.hand.isNotBlank()) {
+                Column {
+                    if (record.dish.isNotBlank()) {
+                        Text("下饭菜：${record.dish}", style = MaterialTheme.typography.bodySmall, color = cs.onSecondaryContainer)
+                    }
+                    if (record.hand.isNotBlank()) {
+                        val handLabel = when (record.hand) { "left" -> "左手"; "right" -> "右手"; else -> record.hand }
+                        Text("惯用手：$handLabel", style = MaterialTheme.typography.bodySmall, color = cs.onSecondaryContainer)
+                    }
+                }
+            }
+
+            // 操作按钮
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 FilledTonalButton(onClick = onMinus, modifier = Modifier.weight(1f).height(48.dp), shape = RoundedCornerShape(14.dp)) {
                     Text("−", fontSize = 22.sp, fontWeight = FontWeight.Bold)
