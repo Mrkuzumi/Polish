@@ -35,6 +35,12 @@ object Prefs {
         prefs(context).edit().putStringSet(KEY_BOOKED, set).apply()
     }
 
+    fun removeBookedDate(context: Context, dateIso: String) {
+        val set = getBookedDates(context).toMutableSet()
+        set.remove(dateIso)
+        prefs(context).edit().putStringSet(KEY_BOOKED, set).apply()
+    }
+
     private fun prefs(context: Context) =
         context.getSharedPreferences(NAME, Context.MODE_PRIVATE)
 }
