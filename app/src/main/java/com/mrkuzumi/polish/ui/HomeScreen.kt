@@ -103,7 +103,6 @@ fun HomeScreen(
                 if (date.year != year || date.monthValue != month) { year = date.year; month = date.monthValue }
                 val r = records[date.toString()] ?: Record(date.toString())
                 inc(date, r.count, r.timestamps)
-                showSnackbar("🦌 ×${r.count + 1}")
             },
             onDayLongPress = { date, localCount ->
                 selectedIso = date.toString()
@@ -114,7 +113,6 @@ fun HomeScreen(
                         val ts = r.timestamps.dropLast(decBy)
                         RecordRepository.save(context, Record(date.toString(), localCount, ts))
                         onDataChanged()
-                        showSnackbar("🦌 ×$localCount")
                     }
                 }
             },
