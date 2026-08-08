@@ -1,5 +1,12 @@
 package com.mrkuzumi.polish
 
+import android.app.AlarmManager
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.Context
+import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -54,6 +61,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        createNotificationChannel()
         setContent {
             PolishTheme {
                 var gender by rememberSaveable { mutableStateOf(Prefs.getGender(this@MainActivity)) }
@@ -70,6 +78,49 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CHANNEL_ID, "磨剑提醒", NotificationManager.IMPORTANCE_HIGH
+            ).apply { description = "预约磨剑日定时通知" }
+            val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            manager.createNotificationChannel(channel)
+        }
+    }
+
+    companion object {
+        private const val CHANNEL_ID = "polish_reminder"
+
+        /** 预约未来某天 21:00 的磨剑提醒 */
+        fun scheduleReminder(context: Context, dateStr: String) {
+            val parts = dateStr.split("-")
+            if (parts.size != 3) return
+            val year = parts[0].toIntOrNull() ?: return
+            val month = parts[1].toIntOrNull() ?: return
+            val day = parts[2].toIntOrNull() ?: return
+
+            val cal = java.util.Calendar.getInstance().apply {
+                set(year, month - 1, day, 21, 0, 0)
+                set(java.util.Calendar.MILLISECOND, 0)
+            }
+            if (cal.timeInMillis <= System.currentTimeMillis()) return
+
+            val intent = Intent(context, PolishReminderReceiver::class.java).apply {
+                putExtra("date", dateStr)
+                putExtra("id", year * 1000 + cal.get(java.util.Calendar.DAY_OF_YEAR))
+            }
+            val pending = PendingIntent.getBroadcast(
+                context,
+                year * 1000 + cal.get(java.util.Calendar.DAY_OF_YEAR),
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+
+            val alarm = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            alarm.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, cal.timeInMillis, pending)
+        }
+    }
 }
 
 @Composable
@@ -83,7 +134,7 @@ private fun MainApp() {
     var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
     var showUpdateDialog by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(Unit) {
-        val info = checkForUpdate("1.2.1")
+        val info = checkForUpdate("1.2.2")
         if (info.available) { updateInfo = info; showUpdateDialog = true }
     }
 
@@ -92,7 +143,6 @@ private fun MainApp() {
     ) { padding ->
         Box(modifier = Modifier.padding(padding).fillMaxSize()) {
             Column(modifier = Modifier.fillMaxSize()) {
-                // 页面内容（含丝滑切换动画）
                 Box(modifier = Modifier.weight(1f)) {
                     Crossfade(
                         targetState = currentTab,
@@ -109,13 +159,12 @@ private fun MainApp() {
                             MainTab.Profile -> ProfileScreen(
                                 dataVersion = dataVersion,
                                 showSnackbar = notify,
-                                onManualUpdateCheck = { checkForUpdate("1.2.1") },
+                                onManualUpdateCheck = { checkForUpdate("1.2.2") },
                             )
                         }
                     }
                 }
 
-                // 悬浮椭圆导航
                 Row(
                     modifier = Modifier
                         .padding(bottom = 12.dp, top = 4.dp)
@@ -131,7 +180,6 @@ private fun MainApp() {
                 }
             }
 
-            // 顶部白色通知（覆盖在内容之上）
             TopNotification(state = notificationState)
         }
     }

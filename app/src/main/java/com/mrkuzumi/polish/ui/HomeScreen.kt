@@ -21,6 +21,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -29,6 +30,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -52,6 +54,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.mrkuzumi.polish.MainActivity
 import com.mrkuzumi.polish.data.Record
 import com.mrkuzumi.polish.data.RecordRepository
 import kotlinx.coroutines.Dispatchers
@@ -80,6 +83,9 @@ fun HomeScreen(
     var year by rememberSaveable { mutableStateOf(today.year) }
     var month by rememberSaveable { mutableStateOf(today.monthValue) }
     var showEditSheet by rememberSaveable { mutableStateOf(false) }
+
+    // 预约未来日期的弹窗
+    var bookingDate by remember { mutableStateOf<LocalDate?>(null) }
 
     // ★ 性能核心：mutableStateOf 包装普通 Map，确保每次变更触发精准重组
     var records by remember { mutableStateOf(RecordRepository.loadAll(context).toMutableMap()) }
@@ -133,7 +139,11 @@ fun HomeScreen(
             onDayTap = { date ->
                 selectedIso = date.toString()
                 if (date.year != year || date.monthValue != month) { year = date.year; month = date.monthValue }
-                inc(date)
+                if (date.isAfter(today)) {
+                    bookingDate = date
+                } else {
+                    inc(date)
+                }
             },
             onDayLongPressEnd = { date, newCount ->
                 selectedIso = date.toString()
@@ -163,6 +173,40 @@ fun HomeScreen(
                 showEditSheet = false
             },
             onDismiss = { showEditSheet = false },
+        )
+    }
+
+    // 未来日期预约弹窗
+    bookingDate?.let { date ->
+        val dateText = "%d月%d日".format(date.monthValue, date.dayOfMonth)
+        AlertDialog(
+            onDismissRequest = { bookingDate = null },
+            title = {
+                Text(
+                    "预约磨剑日？",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            },
+            text = {
+                Text(
+                    "要为 $dateText 约定一个磨剑日提醒吗？\n到了那天记得准时磨剑！(^^ゞ",
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+            },
+            confirmButton = {
+                Button(onClick = {
+                    MainActivity.scheduleReminder(context, date.toString())
+                    bookingDate = null
+                    showSnackbar("已预约 $dateText 21:00 提醒")
+                }) { Text("OK👌") }
+            },
+            dismissButton = {
+                TextButton(onClick = { bookingDate = null }) {
+                    Text("才...才不要呢", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            },
         )
     }
 }
