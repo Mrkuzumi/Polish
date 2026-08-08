@@ -55,6 +55,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.mrkuzumi.polish.data.RecordRepository
 import com.mrkuzumi.polish.util.Prefs
+import com.mrkuzumi.polish.util.Terminology
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -84,7 +85,7 @@ fun ProfileScreen(
     var gender by rememberSaveable { mutableStateOf(Prefs.getGender(context) ?: "male") }
 
     // 用户名
-    var username by rememberSaveable { mutableStateOf(Prefs.getUsername(context)) }
+    var username by rememberSaveable { val s = Prefs.getUsername(context); mutableStateOf(s.ifEmpty { Terminology.defaultUsername(context) }) }
     var showNameDialog by rememberSaveable { mutableStateOf(false) }
     var nameInput by rememberSaveable { mutableStateOf(username) }
 
@@ -175,9 +176,9 @@ fun ProfileScreen(
                     Text("切换", fontSize = 12.sp)
                 }
                 Spacer(Modifier.width(16.dp))
-                Text("累计磨剑", style = MaterialTheme.typography.bodyMedium, color = cs.onSurfaceVariant)
+                Text("累计${Terminology.verb(context)}", style = MaterialTheme.typography.bodyMedium, color = cs.onSurfaceVariant)
                 Spacer(Modifier.width(4.dp))
-                Text("🦌×$lifetimeTotal", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = cs.primary)
+                Text(Terminology.emojiWithCount(context, lifetimeTotal), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = cs.primary)
             }
         }
 
@@ -236,7 +237,7 @@ fun ProfileScreen(
             },
             confirmButton = {
                 Button(onClick = {
-                    val trimmed = nameInput.trim().ifEmpty { "磨剑用户" }
+                    val trimmed = nameInput.trim().ifEmpty { Terminology.defaultUsername(context) }
                     Prefs.setUsername(context, trimmed)
                     username = trimmed
                     showNameDialog = false
@@ -272,7 +273,7 @@ fun ProfileScreen(
             text = {
                 Column {
                     if (info.available) Text(info.releaseNotes, style = MaterialTheme.typography.bodyMedium, color = cs.onSurfaceVariant, maxLines = 20, textAlign = TextAlign.Start)
-                    else Text("当前版本 V1.2.3 已是最新。", color = cs.onSurfaceVariant)
+                    else Text("当前版本 V1.2.4 已是最新。", color = cs.onSurfaceVariant)
                 }
             },
             confirmButton = {

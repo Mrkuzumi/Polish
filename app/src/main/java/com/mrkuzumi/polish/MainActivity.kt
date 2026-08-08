@@ -82,8 +82,8 @@ class MainActivity : ComponentActivity() {
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
-                CHANNEL_ID, "磨剑提醒", NotificationManager.IMPORTANCE_HIGH
-            ).apply { description = "预约磨剑日定时通知" }
+                CHANNEL_ID, "提醒", NotificationManager.IMPORTANCE_HIGH
+            ).apply { description = "预约日定时通知" }
             val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             manager.createNotificationChannel(channel)
         }
@@ -139,7 +139,7 @@ private fun MainApp() {
     var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
     var showUpdateDialog by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(Unit) {
-        val info = checkForUpdate("1.2.3")
+        val info = checkForUpdate("1.2.4")
         if (info.available) { updateInfo = info; showUpdateDialog = true }
     }
 
@@ -164,7 +164,7 @@ private fun MainApp() {
                             MainTab.Profile -> ProfileScreen(
                                 dataVersion = dataVersion,
                                 showSnackbar = notify,
-                                onManualUpdateCheck = { checkForUpdate("1.2.3") },
+                                onManualUpdateCheck = { checkForUpdate("1.2.4") },
                             )
                         }
                     }

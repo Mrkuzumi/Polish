@@ -18,7 +18,7 @@ object Prefs {
     }
 
     fun getUsername(context: Context): String =
-        prefs(context).getString(KEY_USERNAME, "磨剑用户") ?: "磨剑用户"
+        prefs(context).getString(KEY_USERNAME, "") ?: ""
 
     fun setUsername(context: Context, name: String) {
         prefs(context).edit().putString(KEY_USERNAME, name).apply()

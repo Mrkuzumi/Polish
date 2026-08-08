@@ -57,6 +57,7 @@ import androidx.compose.ui.unit.sp
 import com.mrkuzumi.polish.MainActivity
 import com.mrkuzumi.polish.data.Record
 import com.mrkuzumi.polish.data.RecordRepository
+import com.mrkuzumi.polish.util.Terminology
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -183,7 +184,7 @@ fun HomeScreen(
             onDismissRequest = { bookingDate = null },
             title = {
                 Text(
-                    "预约磨剑日？",
+                    Terminology.bookingTitle(context),
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary,
@@ -191,7 +192,7 @@ fun HomeScreen(
             },
             text = {
                 Text(
-                    "要为 $dateText 约定一个磨剑日提醒吗？\n到了那天记得准时磨剑！(^^ゞ",
+                    Terminology.bookingBody(context, dateText),
                     style = MaterialTheme.typography.bodyLarge,
                 )
             },
@@ -199,7 +200,7 @@ fun HomeScreen(
                 Button(onClick = {
                     MainActivity.scheduleReminder(context, date.toString())
                     bookingDate = null
-                    showSnackbar("已预约 $dateText 21:00 提醒")
+                    showSnackbar("已预约 $dateText 21:00 ${Terminology.verb(context)}提醒")
                 }) { Text("OK👌") }
             },
             dismissButton = {
@@ -384,7 +385,7 @@ private fun DayCell(
             )
             if (inMonth && displayCount > 0) {
                 Text(
-                    text = "🦌×$displayCount",
+                    text = Terminology.emojiWithCount(LocalContext.current, displayCount),
                     fontSize = 8.5.sp,
                     color = cs.primary,
                     maxLines = 1,
@@ -428,7 +429,7 @@ private fun BottomActionBar(
                     color = cs.onPrimaryContainer,
                     modifier = Modifier.weight(1f),
                 )
-                Text("🦌×$count", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = cs.primary)
+                Text(Terminology.emojiWithCount(LocalContext.current, count), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = cs.primary)
             }
 
             // 已保存的细节信息

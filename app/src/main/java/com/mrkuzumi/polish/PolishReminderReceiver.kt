@@ -6,6 +6,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import androidx.core.app.NotificationCompat
+import com.mrkuzumi.polish.util.Terminology
 
 class PolishReminderReceiver : BroadcastReceiver() {
 
@@ -24,9 +25,9 @@ class PolishReminderReceiver : BroadcastReceiver() {
 
         val notification = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle("该磨剑了！")
-            .setContentText("$dateStr 的磨剑日到了，记得准时磨剑！(^^ゞ")
-            .setStyle(NotificationCompat.BigTextStyle().bigText("$dateStr 的磨剑日到了！\n点此打开磨剑记录今天份的练习。"))
+            .setContentTitle(Terminology.reminderTitle(context))
+            .setContentText(Terminology.reminderBody(context, dateStr))
+            .setStyle(NotificationCompat.BigTextStyle().bigText(Terminology.reminderBigText(context, dateStr)))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
             .setContentIntent(pending)
