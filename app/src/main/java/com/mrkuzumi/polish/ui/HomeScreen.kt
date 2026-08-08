@@ -34,7 +34,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -82,12 +81,8 @@ fun HomeScreen(
     var month by rememberSaveable { mutableStateOf(today.monthValue) }
     var showEditSheet by rememberSaveable { mutableStateOf(false) }
 
-    // ★ 性能核心：mutableStateMapOf 内存操作，不每次读磁盘
-    val records = remember {
-        mutableStateMapOf<String, Record>().apply {
-            putAll(RecordRepository.loadAll(context))
-        }
-    }
+    // ★ 性能核心：mutableStateOf 包装普通 Map，确保每次变更触发精准重组
+    var records by remember { mutableStateOf(RecordRepository.loadAll(context).toMutableMap()) }
 
     // Debounce 持久化：变更后 500ms 无新操作才写磁盘
     var saveToken by remember { mutableLongStateOf(0L) }
@@ -95,7 +90,7 @@ fun HomeScreen(
         if (saveToken > 0L) {
             delay(500)
             withContext(Dispatchers.IO) {
-                RecordRepository.saveAll(context, records.toMap())
+                RecordRepository.saveAll(context, records)
             }
             onDataChanged() // 通知 StatsScreen 刷新
         }
@@ -104,7 +99,9 @@ fun HomeScreen(
     fun inc(date: LocalDate) {
         val key = date.toString()
         val r = records[key] ?: Record(key)
-        records[key] = r.copy(count = r.count + 1, timestamps = r.timestamps + System.currentTimeMillis())
+        records = records.toMutableMap().apply {
+            this[key] = r.copy(count = r.count + 1, timestamps = r.timestamps + System.currentTimeMillis())
+        }
         saveToken = System.currentTimeMillis()
     }
 
@@ -113,10 +110,12 @@ fun HomeScreen(
         val r = records[key] ?: return
         if (newCount >= r.count) return
         val drop = r.count - newCount
-        records[key] = r.copy(
-            count = newCount,
-            timestamps = if (r.timestamps.size >= drop) r.timestamps.dropLast(drop) else emptyList(),
-        )
+        records = records.toMutableMap().apply {
+            this[key] = r.copy(
+                count = newCount,
+                timestamps = if (r.timestamps.size >= drop) r.timestamps.dropLast(drop) else emptyList(),
+            )
+        }
         saveToken = System.currentTimeMillis()
     }
 
@@ -158,7 +157,7 @@ fun HomeScreen(
         EditRecordSheet(
             record = selectedRecord,
             onSave = { updated ->
-                records[updated.dateIso] = updated
+                records = records.toMutableMap().apply { this[updated.dateIso] = updated }
                 saveToken = System.currentTimeMillis()
                 onDataChanged()
                 showEditSheet = false

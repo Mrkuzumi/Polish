@@ -272,7 +272,7 @@ fun ProfileScreen(
             text = {
                 Column {
                     if (info.available) Text(info.releaseNotes, style = MaterialTheme.typography.bodyMedium, color = cs.onSurfaceVariant, maxLines = 20, textAlign = TextAlign.Start)
-                    else Text("当前版本 V1.1.6 已是最新。", color = cs.onSurfaceVariant)
+                    else Text("当前版本 V1.1.7 已是最新。", color = cs.onSurfaceVariant)
                 }
             },
             confirmButton = {
@@ -285,6 +285,16 @@ fun ProfileScreen(
 }
 
 private fun openUrl(context: android.content.Context, url: String) {
-    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-    if (intent.resolveActivity(context.packageManager) != null) context.startActivity(intent)
+    try {
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        if (intent.resolveActivity(context.packageManager) != null) {
+            context.startActivity(intent)
+        } else {
+            android.widget.Toast.makeText(context, "未找到浏览器应用", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    } catch (_: Exception) {
+        android.widget.Toast.makeText(context, "无法打开链接", android.widget.Toast.LENGTH_SHORT).show()
+    }
 }
