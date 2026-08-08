@@ -57,6 +57,7 @@ import com.mrkuzumi.polish.util.Prefs
 import com.mrkuzumi.polish.util.Terminology
 import java.io.File
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
     dataVersion: Int,
@@ -90,10 +91,10 @@ fun ProfileScreen(
     val records = remember(dataVersion) { RecordRepository.loadAll(context) }
     val lifetimeTotal = records.values.sumOf { it.count }
 
-    // GitHub 跳转确认弹窗
-    var showLinkDialog by rememberSaveable { mutableStateOf(false) }
-    var pendingUrl by remember { mutableStateOf("") }
-    var pendingLabel by remember { mutableStateOf("") }
+    // 专用弹窗
+    var showAuthorDialog by rememberSaveable { mutableStateOf(false) }
+    var showSourceDialog by rememberSaveable { mutableStateOf(false) }
+    var showThanksDialog by rememberSaveable { mutableStateOf(false) }
 
     // ===== 整体布局 =====
     Column(Modifier.fillMaxSize()) {
@@ -178,37 +179,19 @@ fun ProfileScreen(
         // ----- 分隔线 -----
         HorizontalDivider(modifier = Modifier.padding(horizontal = 32.dp, vertical = 4.dp), color = cs.outlineVariant)
 
-        // ----- 下 2/3：功能按钮（适中大小） -----
+        // ----- 下 2/3：功能按钮（2×2 方格） -----
         Column(
-            Modifier.fillMaxWidth().weight(2f).padding(horizontal = 32.dp, vertical = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            Modifier.fillMaxWidth().weight(2f).padding(horizontal = 24.dp, vertical = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Button(
-                onClick = {
-                    pendingUrl = "https://github.com/Mrkuzumi"
-                    pendingLabel = "关于作者 (Mrkuzumi)"
-                    showLinkDialog = true
-                },
-                modifier = Modifier.fillMaxWidth().height(50.dp),
-                shape = RoundedCornerShape(20.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = cs.primaryContainer, contentColor = cs.onPrimaryContainer),
-            ) { Text("关于作者", style = MaterialTheme.typography.titleMedium) }
-            Button(
-                onClick = {
-                    pendingUrl = "https://github.com/Mrkuzumi/Polish"
-                    pendingLabel = "查看源码 (Polish)"
-                    showLinkDialog = true
-                },
-                modifier = Modifier.fillMaxWidth().height(50.dp),
-                shape = RoundedCornerShape(20.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = cs.primaryContainer, contentColor = cs.onPrimaryContainer),
-            ) { Text("查看源码", style = MaterialTheme.typography.titleMedium) }
-            Button(
-                onClick = { onCheckUpdate() },
-                modifier = Modifier.fillMaxWidth().height(50.dp),
-                shape = RoundedCornerShape(20.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = cs.primaryContainer, contentColor = cs.onPrimaryContainer),
-            ) { Text("检查更新", style = MaterialTheme.typography.titleMedium) }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                ProfileButton("关于作者", Modifier.weight(1f)) { showAuthorDialog = true }
+                ProfileButton("查看源码", Modifier.weight(1f)) { showSourceDialog = true }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                ProfileButton("检查更新", Modifier.weight(1f)) { onCheckUpdate() }
+                ProfileButton("特别鸣谢", Modifier.weight(1f)) { showThanksDialog = true }
+            }
         }
     } // 关闭外层 fillMaxSize Column
 
@@ -241,21 +224,89 @@ fun ProfileScreen(
         )
     }
 
-    // GitHub 跳转确认弹窗
-    if (showLinkDialog) {
-        AlertDialog(
-            onDismissRequest = { showLinkDialog = false },
-            title = { Text("跳转外部链接") },
-            text = { Text("是否跳转到「$pendingLabel」对应的GitHub页面？") },
-            confirmButton = {
-                Button(onClick = { openUrl(context, pendingUrl); showLinkDialog = false }) { Text("跳转") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showLinkDialog = false }) { Text("取消") }
-            },
-        )
+    // 关于作者弹窗
+    if (showAuthorDialog) {
+        AlertDialog(onDismissRequest = { showAuthorDialog = false }) {
+            Column(
+                Modifier.fillMaxWidth().padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                // 头像
+                Box(Modifier.size(80.dp).clip(CircleShape).background(cs.surfaceVariant), contentAlignment = Alignment.Center) {
+                    if (avatarFile.exists()) {
+                        AsyncImage(
+                            model = ImageRequest.Builder(context).data(avatarFile).crossfade(true).build(),
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize().clip(CircleShape),
+                            contentScale = ContentScale.Crop,
+                        )
+                    } else {
+                        Icon(Icons.Default.Person, null, Modifier.size(44.dp), tint = cs.onSurfaceVariant)
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+                Text("Mrkuzumi", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text("开发者", style = MaterialTheme.typography.bodyMedium, color = cs.onSurfaceVariant)
+                Spacer(Modifier.height(20.dp))
+                Button(
+                    onClick = { openUrl(context, "https://github.com/Mrkuzumi"); showAuthorDialog = false },
+                    Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = cs.primary),
+                ) { Text("访问 GitHub 主页") }
+            }
+        }
     }
 
+    // 查看源码弹窗
+    if (showSourceDialog) {
+        AlertDialog(onDismissRequest = { showSourceDialog = false }) {
+            Column(
+                Modifier.fillMaxWidth().padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text("📦 源码仓库", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(8.dp))
+                Text("Polish（磨剑 / 挖矿）", style = MaterialTheme.typography.bodyLarge, color = cs.primary)
+                Text("浅嫩粉色 Material You 日常打卡日历", style = MaterialTheme.typography.bodyMedium, color = cs.onSurfaceVariant)
+                Spacer(Modifier.height(20.dp))
+                Button(
+                    onClick = { openUrl(context, "https://github.com/Mrkuzumi/Polish"); showSourceDialog = false },
+                    Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = cs.primary),
+                ) { Text("访问仓库") }
+            }
+        }
+    }
+
+    // 特别鸣谢弹窗
+    if (showThanksDialog) {
+        AlertDialog(onDismissRequest = { showThanksDialog = false }) {
+            Column(
+                Modifier.fillMaxWidth().padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text("🎉 特别鸣谢", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(16.dp))
+                Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("@ImHaoI🔻(｡ì ω í｡)🔻", style = MaterialTheme.typography.bodyLarge, color = cs.onSurface)
+                }
+                Spacer(Modifier.height(16.dp))
+                TextButton(onClick = { showThanksDialog = false }) { Text("关闭") }
+            }
+        }
+    }
+
+}
+
+@Composable
+private fun ProfileButton(label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val cs = MaterialTheme.colorScheme
+    Button(
+        onClick = onClick,
+        modifier = modifier.height(50.dp),
+        shape = RoundedCornerShape(20.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = cs.primaryContainer, contentColor = cs.onPrimaryContainer),
+    ) { Text(label, style = MaterialTheme.typography.titleMedium) }
 }
 
 private fun openUrl(context: android.content.Context, url: String) {
