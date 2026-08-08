@@ -46,6 +46,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -255,7 +256,9 @@ fun ProfileScreen(
                     colors = ButtonDefaults.buttonColors(containerColor = cs.primary),
                 ) { Text("访问 GitHub 主页") }
                 Spacer(Modifier.height(8.dp))
-                Text("https://github.com/Mrkuzumi", style = MaterialTheme.typography.labelSmall, color = cs.onSurfaceVariant)
+                SelectionContainer {
+                    Text("https://github.com/Mrkuzumi", style = MaterialTheme.typography.labelSmall, color = cs.onSurfaceVariant)
+                }
             }
         }
     }
@@ -278,7 +281,9 @@ fun ProfileScreen(
                     colors = ButtonDefaults.buttonColors(containerColor = cs.primary),
                 ) { Text("访问仓库") }
                 Spacer(Modifier.height(8.dp))
-                Text("https://github.com/Mrkuzumi/Polish", style = MaterialTheme.typography.labelSmall, color = cs.onSurfaceVariant)
+                SelectionContainer {
+                    Text("https://github.com/Mrkuzumi/Polish", style = MaterialTheme.typography.labelSmall, color = cs.onSurfaceVariant)
+                }
             }
         }
     }
