@@ -43,9 +43,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -256,16 +258,18 @@ private fun DayCell(
     modifier: Modifier,
 ) {
     val cs = MaterialTheme.colorScheme
+    val haptic = LocalHapticFeedback.current
     var longPressing by remember { mutableStateOf(false) }
     var localCount by remember(recordCount) { mutableIntStateOf(recordCount) }
 
-    // 长按期间持续减少
+    // 长按期间持续减少（带震动反馈）
     LaunchedEffect(longPressing) {
         if (longPressing) {
             localCount = recordCount
             delay(400) // 长按确认后稍等再开始递减
             while (longPressing && localCount > 0) {
                 localCount--
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 delay(150)
             }
         }
@@ -307,9 +311,11 @@ private fun DayCell(
                         }
                     }
                     if (isTap) {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         if (inMonth) onTap()
                     } else {
                         // 长按开始
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         if (inMonth) { longPressing = true }
                         // 等待手指抬起
                         var allUp = false

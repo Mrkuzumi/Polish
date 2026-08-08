@@ -3,7 +3,8 @@ package com.mrkuzumi.polish
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -11,7 +12,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -58,7 +58,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             PolishTheme {
                 var gender by rememberSaveable { mutableStateOf(Prefs.getGender(this@MainActivity)) }
-                AnimatedContent(targetState = gender, label = "gender") { current ->
+                androidx.compose.animation.AnimatedContent(targetState = gender, label = "gender") { current ->
                     if (current == null) {
                         GenderSelectScreen(onSelect = { selected ->
                             gender = selected
@@ -84,44 +84,48 @@ private fun MainApp() {
     var currentTab by rememberSaveable { mutableStateOf(MainTab.Home) }
     var dataVersion by rememberSaveable { mutableStateOf(0) }
 
-    // 自动更新检查
     var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
     var showUpdateDialog by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(Unit) {
-        val info = checkForUpdate("1.1.3")
-        if (info.available) {
-            updateInfo = info
-            showUpdateDialog = true
-        }
+        val info = checkForUpdate("1.1.4")
+        if (info.available) { updateInfo = info; showUpdateDialog = true }
     }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = MaterialTheme.colorScheme.background,
     ) { padding ->
-        Box(modifier = Modifier.padding(padding)) {
-            // 页面内容
-            when (currentTab) {
-                MainTab.Home -> HomeScreen(
-                    dataVersion = dataVersion,
-                    onDataChanged = { dataVersion++ },
-                    showSnackbar = showSnackbar,
-                )
-                MainTab.Stats -> StatsScreen(dataVersion = dataVersion)
-                MainTab.Profile -> ProfileScreen(
-                    showSnackbar = showSnackbar,
-                    onManualUpdateCheck = { checkForUpdate("1.1.3") },
-                )
+        Column(modifier = Modifier.padding(padding).fillMaxSize()) {
+            // 页面内容（占满除底部导航外的全部空间，含丝滑切换动画）
+            Box(modifier = Modifier.weight(1f)) {
+                Crossfade(
+                    targetState = currentTab,
+                    animationSpec = tween(350),
+                    label = "tab-crossfade",
+                ) { tab ->
+                    when (tab) {
+                        MainTab.Home -> HomeScreen(
+                            dataVersion = dataVersion,
+                            onDataChanged = { dataVersion++ },
+                            showSnackbar = showSnackbar,
+                        )
+                        MainTab.Stats -> StatsScreen(dataVersion = dataVersion)
+                        MainTab.Profile -> ProfileScreen(
+                            showSnackbar = showSnackbar,
+                            onManualUpdateCheck = { checkForUpdate("1.1.4") },
+                        )
+                    }
+                }
             }
 
-            // 悬浮椭圆三按钮导航
+            // 悬浮椭圆导航（在内容下方，不遮挡）
             Row(
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 12.dp)
+                    .padding(bottom = 12.dp, top = 4.dp)
                     .clip(RoundedCornerShape(50))
                     .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(50))
-                    .padding(3.dp),
+                    .padding(3.dp)
+                    .align(Alignment.CenterHorizontally),
                 horizontalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 PillTab("首页", Icons.Filled.Home, currentTab == MainTab.Home) { currentTab = MainTab.Home }
