@@ -1,0 +1,21 @@
+# 构建产物
+.gradle/
+build/
+app/build/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# 本机配置（机器相关）
+local.properties
+
+# IDE
+.idea/
+*.iml
+
+# 临时下载的工具包
+tools/
+
+# 系统文件
+.DS_Store
+Thumbs.db

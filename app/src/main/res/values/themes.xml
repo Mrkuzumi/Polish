@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 浅嫩粉色 Material You 风格的宿主主题（具体配色由 Compose 主题接管） -->
+    <style name="Theme.Polish" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">#FFF8F9</item>
+        <item name="android:statusBarColor">#FFF8F9</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:navigationBarColor">#FFF8F9</item>
+    </style>
+</resources>

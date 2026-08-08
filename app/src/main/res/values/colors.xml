@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 自适应图标背景：与 icon.png 黑底一致，遮罩裁切后无缝融合 -->
+    <color name="ic_launcher_background">#000000</color>
+</resources>
