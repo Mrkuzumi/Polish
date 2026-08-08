@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
@@ -146,6 +147,7 @@ fun HomeScreen(
             year = year, month = month, today = today, selected = selected,
             records = records, bookedDates = bookedDates,
             onMonthChange = { y, m -> year = y; month = m },
+            onGoToday = { year = today.year; month = today.monthValue; selectedIso = today.toString() },
             onDayTap = { date ->
                 selectedIso = date.toString()
                 if (date.year != year || date.monthValue != month) { year = date.year; month = date.monthValue }
@@ -253,6 +255,7 @@ private fun CalendarCard(
     records: Map<String, Record>,
     bookedDates: Set<String>,
     onMonthChange: (year: Int, month: Int) -> Unit,
+    onGoToday: () -> Unit,
     onDayTap: (LocalDate) -> Unit,
     onDayLongPressEnd: (LocalDate, localCount: Int) -> Unit,
 ) {
@@ -271,6 +274,11 @@ private fun CalendarCard(
                 }
                 IconButton(onClick = { val n = YearMonth.of(year, month).plusMonths(1); onMonthChange(n.year, n.monthValue) }) {
                     Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, "下月", tint = cs.onSurfaceVariant)
+                }
+                if (YearMonth.of(year, month) != YearMonth.from(today)) {
+                    IconButton(onClick = onGoToday) {
+                        Icon(Icons.Default.CalendarToday, "返回今天", tint = cs.primary)
+                    }
                 }
             }
             Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
