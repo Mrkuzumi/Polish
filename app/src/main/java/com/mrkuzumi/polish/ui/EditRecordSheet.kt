@@ -1,14 +1,23 @@
 package com.mrkuzumi.polish.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -18,18 +27,43 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.mrkuzumi.polish.data.Record
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.launch
+import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.ZoneId
+import kotlin.math.abs
 
 /**
  * 自下而上抽屉式弹出页面，编辑当日磨剑细节。
  * - 下饭菜（文本输入）
  * - 左 / 右手（二选一 FilterChip）
+ * - 具体时间（仿 iOS 竖向滚轮：时 : 分）
+ *
+ * 时间默认取当天最后一次点击时的系统时间；只有用户手动调整过后，保存时才改写
+ * 当天所有时间戳（供"统计"页平均时段 / 时段分布使用）。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,6 +76,11 @@ fun EditRecordSheet(
     var dish by remember(record.dateIso) { mutableStateOf(record.dish) }
     var hand by remember(record.dateIso) { mutableStateOf(record.hand) }
 
+    // 初始时间：默认取当天最后一次点击的系统时间；没有记录时取当前系统时间
+    val initTime = remember(record.dateIso) { initialTimeOf(record) }
+    var hour by remember(record.dateIso) { mutableIntStateOf(initTime.first) }
+    var minute by remember(record.dateIso) { mutableIntStateOf(initTime.second) }
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
@@ -50,6 +89,7 @@ fun EditRecordSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp)
                 .navigationBarsPadding(),
         ) {
@@ -98,11 +138,55 @@ fun EditRecordSheet(
                 )
             }
 
+            Spacer(Modifier.height(20.dp))
+
+            // 具体时间：左 1/3 标签 + 右 2/3 时:分滚轮
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "具体时间：",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                )
+                WheelPicker(
+                    range = 0..23,
+                    selected = hour,
+                    onSelected = { hour = it },
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = "：",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 4.dp),
+                )
+                WheelPicker(
+                    range = 0..59,
+                    selected = minute,
+                    onSelected = { minute = it },
+                    modifier = Modifier.weight(1f),
+                )
+            }
+
             Spacer(Modifier.height(28.dp))
 
             Button(
                 onClick = {
-                    onSave(record.copy(dish = dish.trim(), hand = hand))
+                    var updated = record.copy(dish = dish.trim(), hand = hand)
+                    // 仅当用户手动调整过时间（或旧数据缺少时间戳）时才改写时间戳，
+                    // 否则保留点击当天时的系统时间，统计口径不被破坏
+                    if (hour != initTime.first || minute != initTime.second || updated.timestamps.isEmpty()) {
+                        if (updated.count > 0) {
+                            val ts = LocalDate.parse(record.dateIso)
+                                .atTime(hour, minute)
+                                .atZone(ZoneId.systemDefault())
+                                .toInstant().toEpochMilli()
+                            updated = updated.copy(timestamps = List(updated.count) { ts })
+                        } else {
+                            updated = updated.copy(timestamps = emptyList())
+                        }
+                    }
+                    onSave(updated)
                 },
                 modifier = Modifier.fillMaxWidth().height(52.dp),
                 shape = MaterialTheme.shapes.medium,
@@ -111,6 +195,115 @@ fun EditRecordSheet(
             }
 
             Spacer(Modifier.height(24.dp))
+        }
+    }
+}
+
+/** 取记录当天最后一次点击的系统时间；无记录时用当前系统时间 */
+private fun initialTimeOf(record: Record): Pair<Int, Int> {
+    val ts = record.timestamps.lastOrNull()
+    return if (ts != null) {
+        val ldt = Instant.ofEpochMilli(ts).atZone(ZoneId.systemDefault())
+        ldt.hour to ldt.minute
+    } else {
+        val now = LocalTime.now()
+        now.hour to now.minute
+    }
+}
+
+/**
+ * 仿 iOS 闹钟的竖向滚轮数字选择器：
+ * 上下滑动数字，松手自动吸附居中；中间行高亮放大，两侧缩小变淡；点击任意行可直达。
+ */
+@Composable
+private fun WheelPicker(
+    range: IntRange,
+    selected: Int,
+    onSelected: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val values = remember(range) { range.toList() }
+    val cs = MaterialTheme.colorScheme
+    val itemHeight = 40.dp
+    val visibleCount = 5
+    val itemHeightPx = with(LocalDensity.current) { itemHeight.toPx() }
+    val topPaddingPx = itemHeightPx * ((visibleCount - 1) / 2f) // 上下各留 2 行
+    val viewportH = itemHeightPx * visibleCount
+
+    val listState = rememberLazyListState()
+    val initialIndex = remember { (selected - range.first).coerceIn(0, values.lastIndex) }
+    val scope = rememberCoroutineScope()
+
+    // 初始定位：选中项垂直居中（contentPadding 上下各留 2 行）
+    LaunchedEffect(Unit) {
+        listState.scrollToItem(initialIndex, 0)
+    }
+
+    // 滚动过程中实时跟踪中心行（决定高亮与选中值）
+    var centerIndex by remember { mutableIntStateOf(initialIndex) }
+    LaunchedEffect(listState) {
+        snapshotFlow {
+            val info = listState.layoutInfo
+            val center = info.viewportSize.height / 2f
+            info.visibleItemsInfo.minByOrNull { abs(it.offset + it.size / 2f - center) }?.index
+        }.collect { idx -> if (idx != null) { centerIndex = idx; onSelected(range.first + idx) } }
+    }
+
+    // 滚动停止后吸附到最近的一行
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.isScrollInProgress }
+            .distinctUntilChanged()
+            .filter { !it }
+            .collect {
+                val info = listState.layoutInfo
+                val center = info.viewportSize.height / 2f
+                val nearest = info.visibleItemsInfo.minByOrNull { abs(it.offset + it.size / 2f - center) }
+                if (nearest != null) {
+                    val target = nearest.index * itemHeightPx
+                    val current = listState.firstVisibleItemScrollOffset + listState.firstVisibleItemIndex * itemHeightPx
+                    if (abs(current - target) > 1f) {
+                        listState.animateScrollToItem(nearest.index, 0)
+                    }
+                }
+            }
+    }
+
+    // 滚动位置状态（供各行计算与中心距离，实现缩放/淡化）
+    var scrollPos by remember { mutableFloatStateOf(0f) }
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.firstVisibleItemScrollOffset + listState.firstVisibleItemIndex * itemHeightPx }
+            .collect { scrollPos = it }
+    }
+
+    LazyColumn(
+        state = listState,
+        modifier = modifier.height(itemHeight * visibleCount),
+        contentPadding = PaddingValues(vertical = itemHeight * ((visibleCount - 1) / 2)),
+    ) {
+        itemsIndexed(values) { index, value ->
+            val isCenter = index == centerIndex
+            val top = topPaddingPx + index * itemHeightPx - scrollPos
+            val distance = abs(top + itemHeightPx / 2f - viewportH / 2f) / itemHeightPx
+            val scaleFactor = (1f - 0.16f * distance).coerceIn(0.7f, 1f)
+            val alphaFactor = (1f - 0.3f * distance).coerceIn(0.3f, 1f)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(itemHeight)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(if (isCenter) cs.primaryContainer.copy(alpha = 0.45f) else Color.Transparent)
+                    .clickable { scope.launch { listState.animateScrollToItem(index, 0) } },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "%02d".format(value),
+                    fontSize = 18.sp,
+                    fontWeight = if (isCenter) FontWeight.Bold else FontWeight.Normal,
+                    color = if (isCenter) cs.primary else cs.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.graphicsLayer { scaleX = scaleFactor; scaleY = scaleFactor; alpha = alphaFactor },
+                )
+            }
         }
     }
 }

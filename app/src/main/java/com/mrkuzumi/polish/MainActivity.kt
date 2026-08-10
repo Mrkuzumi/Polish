@@ -220,7 +220,7 @@ private fun MainApp() {
         val info = updateInfo!!
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { showUpdateDialog = false },
-            title = { Text("发现新版本 V${info.latestVersion}", style = MaterialTheme.typography.titleLarge) },
+            title = { Text("发现新版本喵😋 V${info.latestVersion}", style = MaterialTheme.typography.titleLarge) },
             text = {
                 Column {
                     if (dlProgress.percent > 0 && !dlProgress.done) {
@@ -232,7 +232,7 @@ private fun MainApp() {
                             modifier = Modifier.fillMaxWidth(),
                         )
                     } else if (dlProgress.done) {
-                        Text("下载完成！", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+                        Text("下载完成喵😍！", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
                     } else {
                         Text(info.releaseNotes, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 16)
                     }
@@ -250,7 +250,7 @@ private fun MainApp() {
                                 flags = Intent.FLAG_ACTIVITY_NEW_TASK
                             }
                             context.startActivity(intent)
-                            notify("请开启「安装未知应用」权限后重试")
+                            notify("请开启「安装未知应用」权限后重试喵😢")
                         } else {
                             val ok = UpdateDownloader.install(context, file)
                             if (ok) {
@@ -258,7 +258,7 @@ private fun MainApp() {
                                 dlProgress = DownloadProgress(0, false)
                             }
                         }
-                    }) { Text("安装") }
+                    }) { Text("安装！😉") }
                 } else if (dlProgress.percent > 0) {
                     // 正在下载，不显示按钮
                 } else {
@@ -287,7 +287,7 @@ private fun MainApp() {
                             }
                             if (!ok) {
                                 dlProgress = DownloadProgress(0, false)
-                                notify("下载失败，请检查网络后重试")
+                                notify("下载失败😭请检查网络后重试喵")
                             }
                         }
                     }) { Text("下载并更新") }
@@ -300,7 +300,7 @@ private fun MainApp() {
                     TextButton(onClick = {
                         showUpdateDialog = false
                         dlProgress = DownloadProgress(0, false)
-                    }) { Text("以后再说") }
+                    }) { Text("以后再说吧👌") }
                 }
             },
         )

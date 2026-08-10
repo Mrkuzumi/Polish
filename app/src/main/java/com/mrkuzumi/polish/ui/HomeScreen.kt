@@ -67,8 +67,10 @@ import com.mrkuzumi.polish.util.Terminology
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
+import java.time.ZoneId
 
 private val WEEKDAYS = listOf("一", "二", "三", "四", "五", "六", "日")
 private val WEEKDAY_NAMES = listOf(
@@ -497,8 +499,16 @@ private fun BottomActionBar(
             }
 
             // 已保存的细节信息
-            if (record.dish.isNotBlank() || record.hand.isNotBlank()) {
+            if (record.dish.isNotBlank() || record.hand.isNotBlank() || record.timestamps.isNotEmpty()) {
                 Column {
+                    if (record.timestamps.isNotEmpty()) {
+                        val t = Instant.ofEpochMilli(record.timestamps.last()).atZone(ZoneId.systemDefault())
+                        Text(
+                            "具体时间：%02d:%02d".format(t.hour, t.minute),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = cs.onSecondaryContainer,
+                        )
+                    }
                     if (record.dish.isNotBlank()) {
                         Text("下饭菜：${record.dish}", style = MaterialTheme.typography.bodySmall, color = cs.onSecondaryContainer)
                     }
