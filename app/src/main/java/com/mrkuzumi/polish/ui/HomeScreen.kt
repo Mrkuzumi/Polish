@@ -168,9 +168,8 @@ fun HomeScreen(
                 if (date.year != year || date.monthValue != month) { year = date.year; month = date.monthValue }
                 if (date.isAfter(today)) {
                     bookingDate = date
-                } else {
-                    inc(date)
                 }
+                // 不再自动 +1：点日期仅查看详情，记录需用户手动按底部 + 按钮
             },
             onDayLongPressEnd = { date, newCount ->
                 selectedIso = date.toString()
