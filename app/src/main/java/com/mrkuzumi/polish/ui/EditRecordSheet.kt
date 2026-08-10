@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -31,6 +32,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -44,6 +46,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mrkuzumi.polish.data.Record
@@ -60,10 +63,10 @@ import kotlin.math.abs
  * 自下而上抽屉式弹出页面，编辑当日磨剑细节。
  * - 下饭菜（文本输入）
  * - 左 / 右手（二选一 FilterChip）
- * - 具体时间（仿 iOS 竖向滚轮：时 : 分）
+ * - 具体时间（仿 iOS 竖向滚轮：时 : 分，当天每次记录各一行，可逐条调整）
  *
- * 时间默认取当天最后一次点击时的系统时间；只有用户手动调整过后，保存时才改写
- * 当天所有时间戳（供"统计"页平均时段 / 时段分布使用）。
+ * 时间默认取每次点击时的系统时间；只有某条被手动调整过后，保存时才重建当天
+ * 时间戳（供"统计"页平均时段 / 时段分布使用），未调整的条目原样保留。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -76,10 +79,9 @@ fun EditRecordSheet(
     var dish by remember(record.dateIso) { mutableStateOf(record.dish) }
     var hand by remember(record.dateIso) { mutableStateOf(record.hand) }
 
-    // 初始时间：默认取当天最后一次点击的系统时间；没有记录时取当前系统时间
-    val initTime = remember(record.dateIso) { initialTimeOf(record) }
-    var hour by remember(record.dateIso) { mutableIntStateOf(initTime.first) }
-    var minute by remember(record.dateIso) { mutableIntStateOf(initTime.second) }
+    // 逐条时间：默认取每次点击时的系统时间，缺失条目用当前系统时间补足
+    val initTimes = remember(record.dateIso) { initialTimesOf(record) }
+    val times = remember(record.dateIso) { mutableStateListOf(*initTimes.toTypedArray()) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -140,32 +142,44 @@ fun EditRecordSheet(
 
             Spacer(Modifier.height(20.dp))
 
-            // 具体时间：左 1/3 标签 + 右 2/3 时:分滚轮
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            // 具体时间：逐条编辑每次记录的时间（仿 iOS 滚轮），不调整的条目保留点击时的系统时间
+            if (times.isNotEmpty()) {
                 Text(
-                    text = "具体时间：",
+                    text = "具体时间",
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f),
                 )
-                WheelPicker(
-                    range = 0..23,
-                    selected = hour,
-                    onSelected = { hour = it },
-                    modifier = Modifier.weight(1f),
-                )
-                Text(
-                    text = "：",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 4.dp),
-                )
-                WheelPicker(
-                    range = 0..59,
-                    selected = minute,
-                    onSelected = { minute = it },
-                    modifier = Modifier.weight(1f),
-                )
+                Spacer(Modifier.height(8.dp))
+                times.forEachIndexed { i, (h, m) ->
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "第 ${i + 1} 次",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.width(56.dp),
+                        )
+                        WheelPicker(
+                            range = 0..23,
+                            selected = h,
+                            onSelected = { times[i] = it to m },
+                            modifier = Modifier.weight(1f),
+                            itemHeight = 32.dp,
+                        )
+                        Text(
+                            text = "：",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 4.dp),
+                        )
+                        WheelPicker(
+                            range = 0..59,
+                            selected = m,
+                            onSelected = { times[i] = h to it },
+                            modifier = Modifier.weight(1f),
+                            itemHeight = 32.dp,
+                        )
+                    }
+                }
             }
 
             Spacer(Modifier.height(28.dp))
@@ -173,15 +187,18 @@ fun EditRecordSheet(
             Button(
                 onClick = {
                     var updated = record.copy(dish = dish.trim(), hand = hand)
-                    // 仅当用户手动调整过时间（或旧数据缺少时间戳）时才改写时间戳，
-                    // 否则保留点击当天时的系统时间，统计口径不被破坏
-                    if (hour != initTime.first || minute != initTime.second || updated.timestamps.isEmpty()) {
+                    // 仅当用户手动调整过任何一条时间（或旧数据缺少时间戳）时才重建时间戳，
+                    // 否则逐条保留点击时的系统时间，统计口径不被破坏
+                    if (times != initTimes || updated.timestamps.isEmpty()) {
                         if (updated.count > 0) {
-                            val ts = LocalDate.parse(record.dateIso)
-                                .atTime(hour, minute)
-                                .atZone(ZoneId.systemDefault())
-                                .toInstant().toEpochMilli()
-                            updated = updated.copy(timestamps = List(updated.count) { ts })
+                            updated = updated.copy(
+                                timestamps = times.map { (h, m) ->
+                                    LocalDate.parse(record.dateIso)
+                                        .atTime(h, m)
+                                        .atZone(ZoneId.systemDefault())
+                                        .toInstant().toEpochMilli()
+                                },
+                            )
                         } else {
                             updated = updated.copy(timestamps = emptyList())
                         }
@@ -199,15 +216,17 @@ fun EditRecordSheet(
     }
 }
 
-/** 取记录当天最后一次点击的系统时间；无记录时用当前系统时间 */
-private fun initialTimeOf(record: Record): Pair<Int, Int> {
-    val ts = record.timestamps.lastOrNull()
-    return if (ts != null) {
-        val ldt = Instant.ofEpochMilli(ts).atZone(ZoneId.systemDefault())
-        ldt.hour to ldt.minute
-    } else {
-        val now = LocalTime.now()
-        now.hour to now.minute
+/** 取每次点击时记录的系统时间（共 count 条），缺失时间戳的旧数据条目用当前系统时间补足 */
+private fun initialTimesOf(record: Record): List<Pair<Int, Int>> {
+    val now = LocalTime.now()
+    return (0 until record.count).map { i ->
+        val ts = record.timestamps.getOrNull(i)
+        if (ts != null) {
+            val ldt = Instant.ofEpochMilli(ts).atZone(ZoneId.systemDefault())
+            ldt.hour to ldt.minute
+        } else {
+            now.hour to now.minute
+        }
     }
 }
 
@@ -221,10 +240,10 @@ private fun WheelPicker(
     selected: Int,
     onSelected: (Int) -> Unit,
     modifier: Modifier = Modifier,
+    itemHeight: Dp = 40.dp,
 ) {
     val values = remember(range) { range.toList() }
     val cs = MaterialTheme.colorScheme
-    val itemHeight = 40.dp
     val visibleCount = 5
     val itemHeightPx = with(LocalDensity.current) { itemHeight.toPx() }
     val topPaddingPx = itemHeightPx * ((visibleCount - 1) / 2f) // 上下各留 2 行
