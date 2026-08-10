@@ -20,6 +20,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -41,7 +42,8 @@ import java.time.YearMonth
 @Composable
 fun StatsScreen(dataVersion: Int) {
     val context = LocalContext.current
-    val records = remember(dataVersion) { RecordRepository.loadAll(context) }
+    var records by remember { mutableStateOf(RecordRepository.loadAll(context)) }
+    LaunchedEffect(dataVersion) { records = RecordRepository.loadAll(context) }
     val today = remember { LocalDate.now() }
 
     var year by rememberSaveable { mutableStateOf(today.year) }
@@ -252,14 +254,20 @@ private fun HourlyBarChart(timestamps: List<Long>, modifier: Modifier) {
     }
 }
 
-/** 从时间戳列表计算平均时段，返回 "HH:MM" 字符串 */
+/** 从时间戳列表计算平均时段（圆形均值，正确处理跨午夜），返回 "HH:MM" 字符串 */
 private fun averageTimeOfDay(timestamps: List<Long>): String {
     if (timestamps.isEmpty()) return "--:--"
-    val totalMin = timestamps.sumOf { ts ->
-        val inst = java.time.Instant.ofEpochMilli(ts)
-        val ldt = java.time.LocalDateTime.ofInstant(inst, java.time.ZoneId.systemDefault())
-        ldt.hour * 60 + ldt.minute
+    // 圆形均值：把每个时间映射为单位圆上的角度（0~2π），求平均向量后反算时刻
+    val angles = timestamps.map { ts ->
+        val ldt = java.time.Instant.ofEpochMilli(ts)
+            .atZone(java.time.ZoneId.systemDefault()).toLocalTime()
+        ldt.toSecondOfDay().toDouble() / 86400.0 * (2 * Math.PI)
     }
-    val avg = totalMin / timestamps.size
-    return "%02d:%02d".format((avg / 60) % 24, avg % 60)
+    val sinSum = angles.sumOf { kotlin.math.sin(it) }
+    val cosSum = angles.sumOf { kotlin.math.cos(it) }
+    val avgAngle = kotlin.math.atan2(sinSum, cosSum) // (-π, π]
+    val secOfDay = ((avgAngle / (2 * Math.PI)) * 86400 + 86400).toLong() % 86400
+    val h = ((secOfDay / 3600) % 24).toInt()
+    val m = ((secOfDay % 3600) / 60).toInt()
+    return "%02d:%02d".format(h, m)
 }

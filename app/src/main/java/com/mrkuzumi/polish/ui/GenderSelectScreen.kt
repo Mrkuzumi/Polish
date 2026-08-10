@@ -73,7 +73,7 @@ fun GenderSelectScreen(onSelect: (String) -> Unit) {
             Spacer(Modifier.height(48.dp))
 
             Text(
-                text = "初次使用，请选择你的性别",
+                text = "初次见面，你是男孩子还是女孩子吖🤤",
                 style = MaterialTheme.typography.bodyLarge,
                 color = colorScheme.onSurfaceVariant,
             )

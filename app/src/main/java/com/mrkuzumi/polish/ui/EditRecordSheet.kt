@@ -42,11 +42,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mrkuzumi.polish.data.Record
@@ -114,7 +119,7 @@ fun EditRecordSheet(
                 value = dish,
                 onValueChange = { dish = it },
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("例如：红烧肉、麻婆豆腐…") },
+                placeholder = { Text("例如：枫与铃、我理想的异世界生活...") },
                 singleLine = true,
             )
 
@@ -294,9 +299,17 @@ private fun WheelPicker(
             .collect { scrollPos = it }
     }
 
+    // 抑制溢出手势：LazyColumn 到顶/底后，剩余滚动不传导到底弹窗滑退手势
+    val scrollLock = remember {
+        object : NestedScrollConnection {
+            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset = available
+            override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity = available
+        }
+    }
+
     LazyColumn(
         state = listState,
-        modifier = modifier.height(itemHeight * visibleCount),
+        modifier = modifier.height(itemHeight * visibleCount).nestedScroll(scrollLock),
         contentPadding = PaddingValues(vertical = itemHeight * ((visibleCount - 1) / 2)),
     ) {
         itemsIndexed(values) { index, value ->
