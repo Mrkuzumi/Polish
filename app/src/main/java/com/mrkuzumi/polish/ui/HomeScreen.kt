@@ -1,5 +1,10 @@
 package com.mrkuzumi.polish.ui
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -59,6 +64,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import com.mrkuzumi.polish.MainActivity
 import com.mrkuzumi.polish.data.Record
 import com.mrkuzumi.polish.data.RecordRepository
@@ -88,6 +94,13 @@ fun HomeScreen(
 ) {
     val context = LocalContext.current
     val today = remember { LocalDate.now() }
+
+    // Android 13+ 通知需运行时授权，否则预约提醒到点无法弹出
+    val notifPermLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (!granted) showSnackbar("未授予通知权限😢到点将收不到提醒，可在系统设置中开启")
+    }
 
     var selectedIso by rememberSaveable { mutableStateOf(today.toString()) }
     var year by rememberSaveable { mutableStateOf(today.year) }
@@ -232,6 +245,12 @@ fun HomeScreen(
             },
             confirmButton = {
                 Button(onClick = {
+                    // Android 13+ 先请求通知权限，未授权则提示
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                        ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+                    ) {
+                        notifPermLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    }
                     MainActivity.scheduleReminder(context, date.toString())
                     bookingDate = null
                     onDataChanged()

@@ -129,7 +129,14 @@ class MainActivity : ComponentActivity() {
                 )
 
                 val alarm = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-                alarm.set(AlarmManager.RTC_WAKEUP, cal.timeInMillis, pending)
+                // Android 12+ 精确闹钟需要 SCHEDULE_EXACT_ALARM 权限（Android 14+ 默认拒绝），
+                // 未授权时退化为 10 分钟窗口的近似闹钟，避免静默失败导致收不到提醒
+                val canExact = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarm.canScheduleExactAlarms()
+                if (canExact) {
+                    alarm.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, cal.timeInMillis, pending)
+                } else {
+                    alarm.setWindow(AlarmManager.RTC_WAKEUP, cal.timeInMillis, 10 * 60_000L, pending)
+                }
                 // 记录已预约日期
                 Prefs.addBookedDate(context, dateStr)
             } catch (_: Exception) {
@@ -152,21 +159,36 @@ private fun MainApp() {
     // 更新检查 + 下载
     var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
     var showUpdateDialog by rememberSaveable { mutableStateOf(false) }
+    var showUpToDateDialog by rememberSaveable { mutableStateOf(false) }
     var dlProgress by remember { mutableStateOf(DownloadProgress(0, false)) }
 
-    val checkAndNotify = suspend {
-        val info = checkForUpdate("1.2.17")
+    // 当前版本号动态获取（避免写死过期导致每次启动误报新版本）
+    @Suppress("DEPRECATION")
+    val currentVersion = remember {
+        runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }
+            .getOrNull() ?: "1.0.0"
+    }
+
+    /**
+     * 检查更新。
+     * @param manual true = "我的"页手动检查（无更新时弹窗显示当前版本）；
+     *               false = 启动自动检查（无更新时完全静默）
+     */
+    val checkAndNotify: suspend (manual: Boolean) -> Unit = { manual ->
+        val info = checkForUpdate(currentVersion)
         updateInfo = info
         if (info.available) {
+            showUpToDateDialog = false
             showUpdateDialog = true
             dlProgress = DownloadProgress(0, false)
             notify("发现新版本 V${info.latestVersion}！")
-        } else {
-            notify("已是最新版本")
+        } else if (manual) {
+            showUpdateDialog = false
+            showUpToDateDialog = true
         }
     }
 
-    LaunchedEffect(Unit) { checkAndNotify() }
+    LaunchedEffect(Unit) { checkAndNotify(false) }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -190,7 +212,7 @@ private fun MainApp() {
                             MainTab.Profile -> ProfileScreen(
                                 dataVersion = dataVersion,
                                 showSnackbar = notify,
-                                onCheckUpdate = { scope.launch { checkAndNotify() } },
+                                onCheckUpdate = { scope.launch { checkAndNotify(true) } },
                             )
                         }
                     }
@@ -302,6 +324,23 @@ private fun MainApp() {
                         dlProgress = DownloadProgress(0, false)
                     }) { Text("以后再说吧👌") }
                 }
+            },
+        )
+    }
+
+    // "已是最新版本"弹窗（仅手动检查且无更新时弹出）
+    if (showUpToDateDialog) {
+        AlertDialog(
+            onDismissRequest = { showUpToDateDialog = false },
+            title = { Text("已是最新版本") },
+            text = {
+                Text(
+                    "当前版本为 V$currentVersion，已经是最新版本喵😋",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            },
+            confirmButton = {
+                Button(onClick = { showUpToDateDialog = false }) { Text("好哒👌") }
             },
         )
     }
