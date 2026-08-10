@@ -30,9 +30,9 @@
 ## ✨ 功能
 
 - **性别联动** —— 首次启动选男/女，男 → 🦌 磨剑，女 → ⛏ 挖矿，全应用术语自动切换
-- **日历打卡** —— 点日期 +1，长按持续 -1，每次操作记录精确时间戳，震动反馈
-- **编辑细节** —— 底部抽屉编辑「下饭菜」和「左/右手」信息，主页底部实时展示
-- **预约未来日** —— 点未来日期弹窗确认 → 日期标记为浅嫩蓝 → 当天 21:00 推送通知
+- **日历打卡** —— 首次点击日期查看详情，再次点击同一天 +1（含系统时间戳），长按持续 -1，震动反馈
+- **编辑细节** —— 底部抽屉编辑「下饭菜」「左/右手」，逐条仿 iOS 滚轮调整每次记录的具体时间（仅调整过的条目改写时间戳）
+- **预约未来日** —— 点未来日期弹窗确认 → 日期标记为浅嫩蓝 → 当天 21:00 推送通知（Android 13+ 请求通知权限，Doze 兼容）
 - **统计页** —— 本月次数 + 平均时段 + 每日柱状图 + 0:00～24:00 时段分布
 - **个人页** —— 头像上传 + 用户名编辑 + 性别切换 + 终身统计 + GitHub 跳转确认 + 自动更新
 - **更新检查** —— 启动自动检测 GitHub Release → 首页通知 + 弹窗 → 后台下载进度条 → 一键安装
@@ -57,6 +57,29 @@
 
 ### 环境
 - JDK 17 (Temurin) · Android SDK 35 · Gradle 8.9（工程自带 wrapper）
+- GitHub Release 发布需安装 [gh CLI](https://cli.github.com/) 并登录
+
+### 一键构建脚本（推荐）
+
+脚本自动提取版本号、编译、实时输出日志，构建成功后交互式询问是否发布 Release。
+
+**Windows（PowerShell）：**
+```powershell
+.\build.ps1                           # 编译 + 交互式发布
+.\build.ps1 -SkipRelease              # 仅编译，不发布
+.\build.ps1 -JAVA_HOME "D:\jdk-17"   # 指定 JDK 路径
+```
+
+**Linux / macOS（bash）：**
+```bash
+./build.sh                            # 编译 + 交互式发布
+./build.sh --skip-release             # 仅编译
+./build.sh -j /usr/lib/jvm/java-17   # 指定 JDK 路径
+```
+
+脚本工作流：实时编译输出 → 显示 APK 路径和大小 → 提示 `Publish GitHub Release Vx.x.x? [y/N]` → 输入 y → 设置标题和说明 → 自动打 tag、推送、上传 APK 创建 Release。
+
+### 手动构建
 
 ```powershell
 $env:JAVA_HOME = "C:\Program Files\Eclipse Adoptium\jdk-17.0.20.8-hotspot"
