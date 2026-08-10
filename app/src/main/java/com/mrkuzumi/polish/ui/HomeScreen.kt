@@ -164,12 +164,15 @@ fun HomeScreen(
             onMonthChange = { y, m -> year = y; month = m },
             onGoToday = { year = today.year; month = today.monthValue; selectedIso = today.toString() },
             onDayTap = { date ->
+                val alreadySelected = date.toString() == selectedIso
                 selectedIso = date.toString()
                 if (date.year != year || date.monthValue != month) { year = date.year; month = date.monthValue }
                 if (date.isAfter(today)) {
                     bookingDate = date
+                } else if (alreadySelected) {
+                    inc(date) // 二次点击同一天 = 用户意图记录
                 }
-                // 不再自动 +1：点日期仅查看详情，记录需用户手动按底部 + 按钮
+                // 首次点击仅查看详情，不自动 +1
             },
             onDayLongPressEnd = { date, newCount ->
                 selectedIso = date.toString()
